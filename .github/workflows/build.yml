@@ -1,0 +1,42 @@
+name: Build Pipeline VST3
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v5
+      - name: Configure
+        run: cmake -B build -G "Visual Studio 17 2022" -A x64
+      - name: Build
+        run: cmake --build build --config Release --parallel
+      - name: Upload VST3 (Windows)
+        uses: actions/upload-artifact@v4
+        with:
+          name: Pipeline-VST3-Windows
+          path: build/Pipeline_artefacts/Release/VST3/
+          if-no-files-found: error
+
+  macos:
+    runs-on: macos-15-intel   # Mac Intel : file Apple Silicon saturée (binaire universel quand même)
+    steps:
+      - uses: actions/checkout@v5
+      - name: Configure (binaire universel Intel + Apple Silicon)
+        run: cmake -B build -G Xcode -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -DCMAKE_OSX_DEPLOYMENT_TARGET=10.13
+      - name: Build
+        run: cmake --build build --config Release --parallel
+      - name: Signature locale (ad hoc) et archive
+        run: |
+          cd build/Pipeline_artefacts/Release/VST3
+          xattr -cr Pipeline.vst3
+          codesign --force --deep --sign - Pipeline.vst3
+          codesign --verify --deep --strict Pipeline.vst3
+          ditto -c -k --sequesterRsrc --keepParent Pipeline.vst3 "$GITHUB_WORKSPACE/Pipeline-VST3-macOS.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Pipeline-VST3-macOS
+          path: Pipeline-VST3-macOS.zip
+          if-no-files-found: error
