@@ -44,7 +44,7 @@ ROW = (300.0, 922.0, 820.0, 990.0)       # ligne d'etat (texte bleu)
 BAR = (308.0, 998.0, 808.0, 1046.0)      # barre de presets (cadre garde)
 LOGO_BOX = (455, 1302, 664, 1325)
 
-D_KNOBS = 14
+D_KNOBS = 26                              # potards (et leurs graduations / etiquettes) abaisses
 MODE_WORD_NEW_Y = 449.0
 LED_NEW = (558.0, 124.0)
 # remappage du bas (destination <- source) : identite jusqu'a l'ecran, bande de la LED resserree,
@@ -67,9 +67,7 @@ def erase_pointer(c, r):
     out = cv2.GaussianBlur(out, (0, 0), 0.7)
     A = np.where(m[..., None] > 0, out + rng.normal(0, 1.2, out.shape).astype(np.float32), A)
 
-erase_pointer(RATE_C, CAP_R)
-erase_pointer(DEPTH_C, CAP_R)
-erase_pointer(MODE_C, MODE_CAP_R)
+# (les potards du visuel sont retires en entier : le plugin dessine les potards moletes de Holyverb)
 
 def erase_display_text(box, thr=36):
     """ texte de l'ecran : remplace par la trame de l'ecran prise sur la meme ligne (decalages pairs) """
@@ -126,7 +124,9 @@ def row_fill(img, box, edge=8):
     f = left[:, None, :] * (1 - t) + right[:, None, :] * t
     return cv2.GaussianBlur(f, (0, 0), sigmaX=0.1, sigmaY=2.0)
 
-BOXES = {'rate': (280, 158, 488, 404), 'depth': (630, 158, 840, 404), 'word': (516, 690, 602, 726), 'led': (486, 1068, 634, 1146)}
+BOXES = {'rate': (276, 150, 524, 428), 'depth': (626, 150, 872, 428), 'modek': (480, 505, 640, 665),
+         'word': (516, 690, 602, 726), 'led': (486, 1068, 634, 1146)}
+KNOB_OF = {'rate': (RATE_C, SKIRT_R), 'depth': (DEPTH_C, SKIRT_R), 'modek': (MODE_C, MODE_SKIRT_R)}
 FILL, ALPHA = {}, {}
 plate = A.copy()
 for k, (x0, y0, x1, y1) in BOXES.items():
@@ -138,12 +138,43 @@ for k, (x0, y0, x1, y1) in BOXES.items():
     for i in range(e):
         w = (i + 0.5) / e
         fe[i, :] *= w; fe[-1 - i, :] *= w; fe[:, i] *= w; fe[:, -1 - i] *= w
+    if k in KNOB_OF:          # potard du visuel retire avec ses reflets et son ombre : seuls les traits clairs
+        brighter = np.clip((lum(A[y0:y1, x0:x1]) - lum(f) - 18.0) / 25.0, 0, 1)   # (graduations, etiquettes) restent
+        (kcx, kcy), kr = KNOB_OF[k]
+        gy, gx = np.mgrid[y0:y1, x0:x1].astype(np.float32)
+        on_knob = np.hypot(gx - kcx, gy - kcy) < kr + 3.0                          # reflets du potard : retires aussi
+        a = a * brighter * (~on_knob)
+        # hors de la zone des graduations (bulles, ecume) : les traits clairs restent sur place, ils ne descendent pas
+        stay = (gy > kcy + kr + 14.0) | (gx > kcx + kr + 34.0) | (gx < kcx - kr - 34.0)
+        plate[y0:y1, x0:x1] += (A[y0:y1, x0:x1] - f) * (a * stay * fe)[..., None]
+        a = a * (~stay)
     FILL[k] = f; ALPHA[k] = a * fe
     plate[y0:y1, x0:x1] = plate[y0:y1, x0:x1] * (1 - fe[..., None]) + (f + grain(f.shape)) * fe[..., None]
     if k == 'led':            # les bulles autour de la LED restent : seule la LED et sa lueur disparaissent
         gy, gx = np.mgrid[y0:y1, x0:x1].astype(np.float32)
         keep = np.clip((np.hypot(gx - 557.0, gy - 1112.0) - 46.0) / 6.0, 0, 1)
         plate[y0:y1, x0:x1] += (A[y0:y1, x0:x1] - f) * (a * keep)[..., None]
+
+def deshadow(img, c, r, reach=48.0):
+    """ ombre portee residuelle d'un potard retire (vers le bas a droite) : la facade est ramenee a sa teinte voisine.
+    Gain multiplicatif lisse (basse frequence), calcule sur la facade seule (bulles, ecume et textes exclus). """
+    cx, cy = c
+    R = int(r + reach + 30)
+    x0, y0, x1, y1 = int(cx - R), int(cy - R), int(cx + R), int(cy + R)
+    reg = img[y0:y1, x0:x1]
+    L = lum(reg)
+    gy, gx = np.mgrid[y0:y1, x0:x1].astype(np.float32)
+    d = np.hypot(gx - cx - 6.0, gy - cy - 8.0)
+    plain = (L < np.median(L) + 15).astype(np.float32)               # facade (pas les traits clairs)
+    low = cv2.GaussianBlur(L * plain, (0, 0), 10) / (cv2.GaussianBlur(plain, (0, 0), 10) + 1e-4)
+    ring = (d > r + reach) & (d < r + reach + 26) & (plain > 0)
+    ref = np.median(L[ring])
+    zone = np.clip((r + reach - d) / 14.0, 0, 1)
+    gain = 1 + zone * np.clip(ref / np.maximum(low, 1.0) - 1, 0, 0.9)
+    img[y0:y1, x0:x1] = reg * gain[..., None]
+
+for (kc, kr) in KNOB_OF.values():
+    deshadow(plate, kc, kr)
 
 # logo sur les vagues : lettres et anneaux effaces (inpainting), matte blanc conserve pour le recoller
 lx0, ly0, lx1, ly1 = LOGO_BOX
@@ -157,11 +188,23 @@ logo_alpha = np.clip((lum(lreg) - lum(bgL)) / np.maximum(235.0 - lum(bgL), 30.0)
 logo_alpha[-2:] = 0
 plate[ly0 - 6:ly1 + 1, lx0:lx1] = np.where(lm[..., None] > 0, bgL + grain(bgL.shape, 1.5), lreg)
 
+def col_fill(img, box, edge=4):
+    """ mur et tranche du boitier sous un jack : interpolation verticale (le bord du boitier est vertical) """
+    x0, y0, x1, y1 = box
+    top = np.median(img[y0:y0 + edge, x0:x1], axis=0); bot = np.median(img[y1 - edge:y1, x0:x1], axis=0)
+    t = np.linspace(0, 1, y1 - y0, dtype=np.float32)[:, None, None]
+    return top[None] * (1 - t) + bot[None] * t
+
+for jb in ((156, 378, 219, 524), (897, 378, 962, 524)):
+    x0, y0, x1, y1 = jb
+    plate[y0:y1, x0:x1] = col_fill(plate, jb) + grain((y1 - y0, x1 - x0, 3), 1.3)
+
 def paste_delta(img, k, dx, dy):
     x0, y0, x1, y1 = BOXES[k]
     delta = (A[y0:y1, x0:x1] - FILL[k]) * ALPHA[k][..., None]
     img[y0 + dy:y1 + dy, x0 + dx:x1 + dx] += delta
 
+paste_delta(plate, 'modek', 0, 0)
 paste_delta(plate, 'rate', 0, D_KNOBS)
 paste_delta(plate, 'depth', 0, D_KNOBS)
 wb = BOXES['word']
@@ -189,18 +232,50 @@ ny0 = LOGO_DST_BOTTOM - la.shape[0] + 1 + 2
 reg = P2[ny0:ny0 + la.shape[0], lx0:lx1]
 P2[ny0:ny0 + la.shape[0], lx0:lx1] = reg * (1 - la[..., None]) + np.array([236, 238, 236], np.float32) * la[..., None]
 
+# ------------------------------------------------------------------ 4b. pedale un peu plus large : interieur etire de 28 px
+# (4,5 %), bords du boitier, filet et coins arrondis deplaces sans deformation
+WIDEN = 28
+XK_SRC = np.array([0, 248, 868, W - 1], np.float32)
+XK_DST = np.array([0, 248, 868 + WIDEN, W - 1 + WIDEN], np.float32)
+W2 = W + WIDEN
+xd = np.arange(W2, dtype=np.float32)
+xs = np.interp(xd, XK_DST, XK_SRC).astype(np.float32)
+xs = cv2.GaussianBlur(xs.reshape(1, -1), (0, 1), sigmaX=4.0, sigmaY=0.1).ravel()
+P2 = cv2.remap(P2, np.tile(xs[None, :], (P2.shape[0], 1)), np.repeat(np.arange(P2.shape[0], dtype=np.float32)[:, None], W2, axis=1),
+               interpolation=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
+def X(x): return float(np.interp(x, XK_SRC, XK_DST))
+
 # ------------------------------------------------------------------ 5. recadrage serre 760 x 958 et mise a l'echelle 1520 x 1916
 CY0 = 31
 CY1 = to_dst(1344) + 16
 HC = int(round(CY1 - CY0))
 WC = int(round(HC * 760 / 958))
-CX0 = int(round(558.0 - WC / 2))
+CX0 = int(round(X(558.0) - WC / 2))
 P3 = P2[CY0:CY0 + HC, CX0:CX0 + WC]
 W2F, H2F = 1520, 1916
 canvas = cv2.resize(np.clip(P3, 0, 255), (W2F, H2F), interpolation=cv2.INTER_CUBIC).astype(np.float32)
 SX, SY = W2F / WC, H2F / HC
-def T(p): return ((p[0] - CX0) * SX, (p[1] - CY0) * SY)
+def T(p): return ((X(p[0]) - CX0) * SX, (p[1] - CY0) * SY)       # px du visuel (x source, y remappe) -> fond 2x
 def U(p): x, y = T(p); return (x / 2.0, y / 2.0)
+
+# ------------------------------------------------------------------ 5b. jacks : embases chromees de Holyverb (OUT a gauche, IN a droite)
+def paste_sprite(img, x0, y0):
+    global canvas
+    a = np.asarray(img).astype(np.float32) / 255
+    h_, w_ = a.shape[:2]
+    sm = cv2.GaussianBlur(a[..., 3], (0, 0), 4)                       # ombre portee sur le mur (lumiere en haut a gauche)
+    canvas[y0 + 5:y0 + 5 + h_, x0 + 4:x0 + 4 + w_] *= (1 - 0.5 * sm)[..., None]
+    al = a[..., 3:]
+    canvas[y0:y0 + h_, x0:x0 + w_] = canvas[y0:y0 + h_, x0:x0 + w_] * (1 - al) + a[..., :3] * 255 * al
+    return a[..., 3]
+JACK_Y = T((0, 448.0))[1]
+jo = Image.open(os.path.join(ROOT, 'assets', 'kit', 'embase_jack_gauche_OUT.png')).convert('RGBA')
+ji = Image.open(os.path.join(ROOT, 'assets', 'kit', 'embase_jack_droite_IN.png')).convert('RGBA')
+exL, exR = T((214.0, 0))[0], T((900.5, 0))[0]                     # tranches du boitier
+JL = (int(round(exL - jo.width + 4)), int(round(JACK_Y - jo.height / 2)))
+JR = (int(round(exR - 4)), int(round(JACK_Y - ji.height / 2)))
+aL = paste_sprite(jo, *JL)
+aR = paste_sprite(ji, *JR)
 
 # ------------------------------------------------------------------ 6a. LED eteinte : bague chromee, gorge sombre, lentille bleue sombre
 YY, XX = np.mgrid[0:H2F, 0:W2F].astype(np.float32)
@@ -255,11 +330,9 @@ blue = cv2.morphologyEx(blue, cv2.MORPH_CLOSE, np.ones((15, 15), np.uint8))
 cnts, _ = cv2.findContours(blue, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
 SIL = np.zeros((H2F, W2F), np.uint8)
 cv2.drawContours(SIL, [max(cnts, key=cv2.contourArea)], -1, 255, -1)
-wall = cv2.GaussianBlur(out.astype(np.float32).mean(-1), (0, 0), 25)
-jk = (np.abs(out.astype(np.float32).mean(-1) - wall) > 14).astype(np.uint8) * 255
-for (jx0, jx1) in ((int(T((165, 0))[0]), int(T((222, 0))[0])), (int(T((898, 0))[0]), int(T((950, 0))[0]))):
-    jy0, jy1 = int(T((0, 385))[1]), int(T((0, 465))[1])
-    SIL[jy0:jy1, jx0:jx1] = np.maximum(SIL[jy0:jy1, jx0:jx1], jk[jy0:jy1, jx0:jx1])
+for (x0_, y0_), a_ in ((JL, aL), (JR, aR)):
+    h_, w_ = a_.shape
+    SIL[y0_:y0_ + h_, x0_:x0_ + w_] = np.maximum(SIL[y0_:y0_ + h_, x0_:x0_ + w_], (a_ * 255).astype(np.uint8))
 SIL = cv2.GaussianBlur(cv2.morphologyEx(SIL, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8)), (0, 0), 0.8)
 Image.fromarray(SIL).save(os.path.join(HERE, 'pedal_mask.png'))
 

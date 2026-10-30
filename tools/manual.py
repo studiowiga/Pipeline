@@ -16,7 +16,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SHOTS = sys.argv[1]
 OUT = sys.argv[2]
-VERSION = "1.2.0"
+VERSION = "1.3.0"
 TMP = os.path.dirname(os.path.abspath(OUT))
 FONTS = os.path.join(ROOT, "assets", "fonts")
 
@@ -38,8 +38,8 @@ src = shot("pipeline_full.png")
 ann = src.copy(); dr = ImageDraw.Draw(ann)
 fnt = ImageFont.truetype(os.path.join(FONTS, "Poppins-Bold.ttf"), 30)
 marks = [  # numero, x, y (unites)
-    (1, 170, 118), (2, 592, 118), (3, 470, 300), (4, 606, 677), (5, 606, 725),
-    (6, 420, 68), (7, 462, 862), (8, 86, 288), (9, 674, 288)]
+    (1, 168, 128), (2, 596, 128), (3, 470, 300), (4, 606, 677), (5, 606, 725),
+    (6, 420, 68), (7, 462, 862), (8, 80, 300), (9, 680, 300)]
 for n, x, y in marks:
     cx, cy, r = x * K, y * K, 24
     dr.ellipse((cx - r, cy - r, cx + r, cy + r), fill=(255, 255, 255), outline=ACC_RGB, width=5)
@@ -56,7 +56,7 @@ def strip(images, path, gap=16):
     for i in images: s.paste(i, (x, 0)); x += i.width + gap
     s.save(path); return path
 
-knobs_img = strip([crop_u(shot("pipeline_full.png"), (166, 100, 596, 270))], os.path.join(TMP, "pipeline_knobs.png"))
+knobs_img = strip([crop_u(shot("pipeline_full.png"), (160, 110, 600, 290))], os.path.join(TMP, "pipeline_knobs.png"))
 mode_img = strip([crop_u(shot("pipeline_full.png"), (272, 290, 490, 492)), crop_u(shot("pipeline_envp.png"), (290, 312, 470, 492))],
                  os.path.join(TMP, "pipeline_mode.png"))
 fs_img = strip([crop_u(shot("pipeline_bypass.png"), (312, 800, 448, 918)), crop_u(shot("pipeline_full.png"), (312, 800, 448, 932)),
@@ -191,8 +191,8 @@ T["en"] = dict(
  ctl_t="4. Controls",
  ctl=[("RATE", "Speed of the LFO, i.e. how fast the pitch rises and falls: 0.1 Hz fully counter-clockwise, about 1.8 Hz at 12 o'clock, 5.6 Hz at 3 o'clock, 16 Hz fully clockwise. In <b>Env R</b> it becomes the sensitivity of the envelope; in <b>Env P</b> the sensitivity and overall range of the pitch bend. With <b>tempo sync</b> on, RATE chooses a note value instead (see section 6)."),
       ("DEPTH", "Intensity of the vibrato (amplitude of the LFO). The curve is progressive: a light shimmer up to 11 o'clock, a classic vibrato around noon, seasick bends beyond. As on any delay-line vibrato, the same DEPTH gives more pitch change at a higher RATE; at extreme settings the deviation is held around +4 / -6 semitones so the sound never turns inside out. In <b>Env D</b>, DEPTH becomes the envelope sensitivity; in <b>Env P</b>, the dry / wet mix."),
-      ("Turning the knobs", "Drag up / right to increase; Shift for fine adjustment; mouse wheel; double-click returns to 12 o'clock. Only the white marker turns, the knob body and its reflections stay still, lit from the top left like the rest of the pedal.")],
- knobs_cap="RATE and DEPTH: the white marker turns, the knob body stays still.",
+      ("Turning the knobs", "Drag up / right to increase; Shift for fine adjustment; mouse wheel; double-click returns to 12 o'clock. These are the knurled knobs of Holyverb: the knurling turns with the knob, the white index and dot follow the exact angle, while the reflections and the shadow stay still, lit from the top left like the rest of the pedal.")],
+ knobs_cap="RATE and DEPTH: the knurled knobs of Holyverb.",
  modes_t="5. The eight modes",
  modes_intro="As in the original manual, the modes are listed from \"not that weird\" to \"wow, that's weird\". Click the MODE knob and drag, use the mouse wheel, or click directly on a label around the selector.",
  modes=[["Mode", "What you hear", "RATE", "DEPTH"],
@@ -267,8 +267,8 @@ T["fr"] = dict(
  ctl_t="4. Les commandes",
  ctl=[("RATE", "Vitesse du LFO, c'est-à-dire la rapidité avec laquelle la hauteur monte et descend : 0,1 Hz tout à gauche, environ 1,8 Hz à 12 h, 5,6 Hz à 15 h, 16 Hz tout à droite. En <b>Env R</b>, il devient la sensibilité de l'enveloppe ; en <b>Env P</b>, la sensibilité et l'amplitude générale du bend. Avec la <b>synchro tempo</b>, RATE choisit une valeur de note (voir section 6)."),
       ("DEPTH", "Intensité du vibrato (amplitude du LFO). La course est progressive : léger frémissement jusqu'à 11 h, vibrato classique vers midi, tangage au-delà. Comme sur tout vibrato à ligne de retard, un même DEPTH donne plus d'écart de hauteur quand RATE est plus élevé ; aux réglages extrêmes, l'écart est tenu vers +4 / -6 demi-tons pour que le son ne se retourne jamais. En <b>Env D</b>, DEPTH devient la sensibilité de l'enveloppe ; en <b>Env P</b>, le mélange sec / traité."),
-      ("Tourner les potards", "Tirez vers le haut / la droite pour augmenter ; Maj = réglage fin ; molette ; double-clic = retour à 12 h. Seul le repère blanc tourne, le corps du potard et ses reflets restent fixes, éclairés depuis le haut à gauche comme le reste de la pédale.")],
- knobs_cap="RATE et DEPTH : le repère blanc tourne, le corps du potard reste fixe.",
+      ("Tourner les potards", "Tirez vers le haut / la droite pour augmenter ; Maj = réglage fin ; molette ; double-clic = retour à 12 h. Ce sont les potards moletés de Holyverb : le moletage tourne avec le potard, l'index blanc et le point suivent l'angle exact, tandis que les reflets et l'ombre restent fixes, éclairés depuis le haut à gauche comme le reste de la pédale.")],
+ knobs_cap="RATE et DEPTH : les potards moletés de Holyverb.",
  modes_t="5. Les huit modes",
  modes_intro="Comme dans le manuel d'origine, les modes sont classés du « pas si bizarre » au « franchement bizarre ». Cliquez sur le sélecteur MODE et tirez, utilisez la molette, ou cliquez directement sur une étiquette autour du sélecteur.",
  modes=[["Mode", "Ce qu'on entend", "RATE", "DEPTH"],

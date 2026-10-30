@@ -24,24 +24,13 @@ namespace
 
     Rectangle<float> square (Point<float> c, float half) { return { c.x - half, c.y - half, half * 2.0f, half * 2.0f }; }
 
-    // repere peint en blanc sur le dessus du chapeau : lumiere en haut a gauche, peinture un poil plus claire
-    // tournee vers elle, fine ombre de relief vers le bas droite (le reflet du chapeau, dans le fond, reste fixe)
-    void paintPointer (Graphics& g, Point<float> c, float r, float a, float f0, float f1, float w)
-    {
-        const Point<float> p0 (c.x + f0 * r * std::sin (a), c.y - f0 * r * std::cos (a));
-        const Point<float> p1 (c.x + f1 * r * std::sin (a), c.y - f1 * r * std::cos (a));
-        Path line; line.startNewSubPath (p0); line.lineTo (p1);
-        Path s;
-        PathStrokeType (w, PathStrokeType::curved, PathStrokeType::rounded).createStrokedPath (s, line);
-        const float lightFacing = 0.5f + 0.5f * std::cos (a + MathConstants<float>::pi * 0.20f);
-        g.setColour (Colours::black.withAlpha (0.55f));
-        g.fillPath (s, AffineTransform::translation (0.35f, 0.6f));
-        ColourGradient paint (Colour::greyLevel (0.97f), p1.x, p1.y, Colour::greyLevel (0.82f + 0.10f * lightFacing), p0.x, p0.y, false);
-        g.setGradientFill (paint);
-        g.fillPath (s);
-        g.setColour (Colours::white.withAlpha (0.30f));
-        g.fillPath (s, AffineTransform::translation (-0.25f, -0.35f));
-    }
+    // potard Holyverb : image de 300 px pour 150 unites, rayon exterieur du moletage 61,45 unites (ombre comprise dans l'image)
+    constexpr float stripKnobR = 61.45f / 75.0f;     // rayon du moletage / demi-cote de l'image
+    constexpr int   stripFrames = 8, knurlTeeth = 76;
+    float spriteHalf (float knobR) { return knobR / stripKnobR; }
+    const float rateR = layout::knobSkirt * 1.02f;   // potards RATE / DEPTH (taille des potards du visuel)
+    const float modeR = layout::modeSkirt * 1.04f;   // selecteur MODE
+
 }
 
 //==============================================================================
@@ -216,6 +205,7 @@ PipelineAudioProcessorEditor::PipelineAudioProcessorEditor (PipelineAudioProcess
     setLookAndFeel (&lnf);
     background = ImageCache::getFromMemory (BinaryData::background_jpg, BinaryData::background_jpgSize);
     glowLed    = ImageCache::getFromMemory (BinaryData::glow_led_png, BinaryData::glow_led_pngSize);
+    knobStrip  = ImageCache::getFromMemory (BinaryData::knob_strip_png, BinaryData::knob_strip_pngSize);
     labelFace = Typeface::createSystemTypefaceFor (BinaryData::BarlowCondensedSemiBold_ttf, BinaryData::BarlowCondensedSemiBold_ttfSize);
     boldFace  = Typeface::createSystemTypefaceFor (BinaryData::BarlowCondensedBold_ttf, BinaryData::BarlowCondensedBold_ttfSize);
 
@@ -286,6 +276,13 @@ void PipelineAudioProcessorEditor::rebuildCaches (float sc)
     const float s = (float) h / (float) baseH;
     const int tw = roundToInt (layout::glowRect.getWidth() * s * sc), th = roundToInt (layout::glowRect.getHeight() * s * sc);
     glowLedS = (tw >= glowLed.getWidth()) ? glowLed : glowLed.rescaled (tw, th, Graphics::highResamplingQuality);
+    auto stripAt = [this, s, sc] (float knobR)
+    {
+        const int px = roundToInt (spriteHalf (knobR) * 2.0f * s * sc);
+        return (px <= 0 || px >= knobStrip.getWidth()) ? Image() : knobStrip.rescaled (px, px * stripFrames, Graphics::highResamplingQuality);
+    };
+    knobBig = stripAt (rateR);
+    knobSmall = stripAt (modeR);
     repaint();
 }
 
@@ -418,9 +415,9 @@ void PipelineAudioProcessorEditor::timerCallback()
         if (std::abs (knobs[k]->getValue() - drawnKnob[k]) > 0.002f)
         {
             drawnKnob[k] = knobs[k]->getValue();
-            askRepaint (scaled (square (kc[k], layout::knobTop + 4.0f)));
+            askRepaint (scaled (square (kc[k], spriteHalf (rateR) + 2.0f)));
         }
-    if (modeKnob.tick()) askRepaint (scaled (square (layout::modePos, layout::modeTop + 4.0f)));
+    if (modeKnob.tick()) askRepaint (scaled (square (layout::modePos, spriteHalf (modeR) + 2.0f)));
 
     // ligne d'etat : apparait quand un reglage bouge, reste 2,5 s puis s'efface
     int changed = -1, numChanged = 0;
@@ -506,12 +503,52 @@ void PipelineAudioProcessorEditor::drawLed (Graphics& g)
     }
 }
 
+// potards de Holyverb : le moletage tourne (8 phases : il a 76 dents, la periode est de 4,7 degres),
+// l'index blanc et le point sont dessines a l'angle exact ; reflets et ombre fixes (lumiere en haut a gauche)
 void PipelineAudioProcessorEditor::drawKnobs (Graphics& g)
 {
-    // reperes du visuel : du centre du chapeau vers son bord, gris clair a bouts arrondis
-    paintPointer (g, layout::ratePos,  layout::knobTop, knobAngle (rateKnob.getValue()),  0.06f, 0.90f, 5.0f);
-    paintPointer (g, layout::depthPos, layout::knobTop, knobAngle (depthKnob.getValue()), 0.06f, 0.90f, 5.0f);
-    paintPointer (g, layout::modePos,  layout::modeTop, modeKnob.getShownAngle(),         0.06f, 0.92f, 4.4f);
+    struct K { Point<float> c; float r, angle; const Image* img; bool dot; };
+    const K ks[3] = { { layout::ratePos,  rateR, knobAngle (rateKnob.getValue()),  &knobBig,   true },
+                      { layout::depthPos, rateR, knobAngle (depthKnob.getValue()), &knobBig,   true },
+                      { layout::modePos,  modeR, modeKnob.getShownAngle(),         &knobSmall, false } };
+    for (const auto& k : ks)
+    {
+        const Image& img = k.img->isValid() ? *k.img : knobStrip;
+        if (! img.isValid()) continue;
+        const float period = MathConstants<float>::twoPi / (float) knurlTeeth;
+        float ph = std::fmod (k.angle, period);
+        if (ph < 0.0f) ph += period;
+        const int frame = jlimit (0, stripFrames - 1, (int) (ph / period * (float) stripFrames));
+        const int fs = img.getWidth();
+        const float half = spriteHalf (k.r);
+        // l'image a l'echelle est dessinee pixel pour pixel (transformation inverse de l'echelle de la fenetre)
+        g.setImageResamplingQuality (k.img->isValid() ? Graphics::mediumResamplingQuality : Graphics::highResamplingQuality);
+        const auto frameImg = img.getClippedImage ({ 0, frame * fs, fs, fs });
+        g.drawImage (frameImg, Rectangle<float> (k.c.x - half, k.c.y - half, half * 2.0f, half * 2.0f));
+
+        // index blanc + point (comme Holyverb), ombre fine vers le bas a droite
+        const float R = k.r;
+        const float ux = std::sin (k.angle), uy = -std::cos (k.angle);
+        Path line;
+        line.startNewSubPath (k.c.x + ux * R * 0.10f, k.c.y + uy * R * 0.10f);
+        line.lineTo          (k.c.x + ux * R * (k.dot ? 0.60f : 0.66f), k.c.y + uy * R * (k.dot ? 0.60f : 0.66f));
+        const PathStrokeType stroke (R * (k.dot ? 0.056f : 0.07f), PathStrokeType::curved, PathStrokeType::rounded);
+        g.setColour (Colours::black.withAlpha (0.45f));
+        g.strokePath (line, stroke, AffineTransform::translation (R * 0.012f, R * 0.018f));
+        g.setGradientFill (ColourGradient (Colour (0xfff7f7f9), k.c.x - R * 0.4f, k.c.y - R * 0.4f,
+                                           Colour (0xffc9c9cd), k.c.x + R * 0.4f, k.c.y + R * 0.4f, false));
+        g.strokePath (line, stroke);
+        if (k.dot)
+        {
+            const Point<float> d (k.c.x + ux * R * 0.845f, k.c.y + uy * R * 0.845f);
+            const float dr = R * 0.042f;
+            g.setColour (Colours::black.withAlpha (0.5f));
+            g.fillEllipse (d.x - dr + R * 0.01f, d.y - dr + R * 0.015f, dr * 2.0f, dr * 2.0f);
+            g.setGradientFill (ColourGradient (Colours::white, d.x - dr * 0.4f, d.y - dr * 0.5f,
+                                               Colour (0xffbdbdc2), d.x + dr, d.y + dr, true));
+            g.fillEllipse (d.x - dr, d.y - dr, dr * 2.0f, dr * 2.0f);
+        }
+    }
 }
 
 void PipelineAudioProcessorEditor::drawFootswitch (Graphics& g)

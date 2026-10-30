@@ -137,6 +137,8 @@ private:
     PipelineLookAndFeel lnf;
 
     juce::Image background, bgScaled, glowLed, glowLedS;
+    // potards moletes de Holyverb : filmstrip 8 phases du moletage (lumiere fixe en haut a gauche), copies a l'echelle
+    juce::Image knobStrip, knobBig, knobSmall;
     int cacheW = 0, cacheH = 0;
     float cacheScale = 0.0f;
     int resizeSettle = 0;
