@@ -758,8 +758,8 @@ void PipelineAudioProcessorEditor::showContextMenu (int learnIdx)
     PopupMenu settings;
     settings.addItem (44, "Flexi-Switch: hold = momentary", true, proc.raw ("flexi") > 0.5f);
     settings.addSeparator();
-    settings.addItem (41, "MIDI footswitch latching (127 = on / 0 = off)", true, proc.raw ("midiFsMode") < 0.5f);
-    settings.addItem (42, "MIDI footswitch toggles on each press", true, proc.raw ("midiFsMode") > 0.5f);
+    settings.addItem (41, "MIDI footswitch: each press toggles on / off (default)", true, proc.raw ("midiFsMode") < 0.5f);
+    settings.addItem (42, "MIDI footswitch latching (127 = on / 0 = off)", true, proc.raw ("midiFsMode") > 0.5f);
     menu.addSubMenu ("Settings", settings);
 
     PopupMenu midi;
@@ -781,7 +781,9 @@ void PipelineAudioProcessorEditor::showContextMenu (int learnIdx)
     menu.addSeparator();
     menu.addItem (999, "Pipeline vibrato v" + String (JucePlugin_VersionString) + " - STUDIO WIGA", false);
 
-    menu.showMenuAsync (PopupMenu::Options().withTargetComponent (this),
+    // le menu s'ouvre sous le pointeur (et non en haut de la fenetre)
+    const auto mouse = Desktop::getInstance().getMainMouseSource().getScreenPosition().roundToInt();
+    menu.showMenuAsync (PopupMenu::Options().withTargetScreenArea ({ mouse.x, mouse.y, 1, 1 }).withParentComponent (nullptr),
         [safe = Component::SafePointer<PipelineAudioProcessorEditor> (this)] (int r)
         {
             if (safe == nullptr || r == 0) return;

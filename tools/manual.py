@@ -16,7 +16,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SHOTS = sys.argv[1]
 OUT = sys.argv[2]
-VERSION = "1.3.1"
+VERSION = "1.3.2"
 TMP = os.path.dirname(os.path.abspath(OUT))
 FONTS = os.path.join(ROOT, "assets", "fonts")
 
@@ -59,8 +59,8 @@ def strip(images, path, gap=16):
 knobs_img = strip([crop_u(shot("pipeline_full.png"), (150, 112, 610, 300))], os.path.join(TMP, "pipeline_knobs.png"))
 mode_img = strip([crop_u(shot("pipeline_full.png"), (262, 300, 504, 502)), crop_u(shot("pipeline_envp.png"), (262, 300, 504, 502))],
                  os.path.join(TMP, "pipeline_mode.png"))
-fs_img = strip([crop_u(shot("pipeline_bypass.png"), (312, 796, 448, 914)), crop_u(shot("pipeline_full.png"), (312, 796, 448, 914)),
-                crop_u(shot("pipeline_pressed.png"), (312, 796, 448, 914))], os.path.join(TMP, "pipeline_fs.png"))
+fs_img = strip([crop_u(shot("pipeline_bypass.png"), (316, 778, 446, 904)), crop_u(shot("pipeline_full.png"), (316, 778, 446, 904)),
+                crop_u(shot("pipeline_pressed.png"), (316, 778, 446, 904))], os.path.join(TMP, "pipeline_fs.png"))
 disp_img = strip([crop_u(shot(p), (170, 660, 592, 784)) for p in ("pipeline_full.png", "pipeline_envp.png")], os.path.join(TMP, "pipeline_disp.png"), gap=10)
 disp2_img = strip([crop_u(shot(p), (170, 660, 592, 784)) for p in ("pipeline_status.png", "pipeline_sync.png")], os.path.join(TMP, "pipeline_disp2.png"), gap=10)
 
@@ -220,8 +220,8 @@ T["en"] = dict(
  midi=[["Rate", "CC 20", "Continuous 0-127; 14-bit with CC 52"], ["Depth", "CC 21", "Continuous 0-127; 14-bit with CC 53"],
        ["Mode", "CC 22", "8-position selector: 0-127 split into 8 equal zones (Sine to Env P)"],
        ["Tempo Sync", "CC 23", "Switch: 64 and above = ON"],
-       ["Footswitch", "CC 24", "Latching (127 = on / 0 = off, so a momentary MIDI switch gives momentary operation) or toggle on each press"]],
- midi2=["<b>MIDI footswitch mode</b>: right-click &gt; <b>Settings</b> &gt; <b>MIDI footswitch latching</b> (default) or <b>toggles on each press</b>.",
+       ["Footswitch", "CC 24", "Each press toggles on / off (default, for momentary footswitches such as the M-Vave Chocolate) or latching (127 = on / 0 = off)"]],
+ midi2=["<b>MIDI footswitch mode</b>: right-click &gt; <b>Settings</b> &gt; <b>MIDI footswitch: each press toggles on / off</b> (default: one press = on, next press = off, no need to hold) or <b>MIDI footswitch latching (127 = on / 0 = off)</b> for latching switches.",
         "<b>Expression pedals</b> on RATE or DEPTH are smoothed (ramp between two messages, then a 2-pole smoothing), 14-bit CC accepted, pedal travel learnt automatically (0 and 100 % reached even if the pedal only sends 2-116) and small dead zones at both ends. A pedal on RATE in Env P becomes a real-time bend range control.",
         "<b>Program Change</b> 1-15 loads the factory presets."],
  win_t="8. Window and display",
@@ -296,8 +296,8 @@ T["fr"] = dict(
  midi=[["Rate", "CC 20", "Continu 0-127 ; 14 bits avec CC 52"], ["Depth", "CC 21", "Continu 0-127 ; 14 bits avec CC 53"],
        ["Mode", "CC 22", "Sélecteur 8 positions : 0-127 découpé en 8 zones égales (Sine à Env P)"],
        ["Tempo Sync", "CC 23", "Bascule : 64 et plus = ON"],
-       ["Footswitch", "CC 24", "À accrochage (127 = on / 0 = off, un footswitch MIDI momentané donne donc un fonctionnement momentané) ou bascule à chaque appui"]],
- midi2=["<b>Mode du footswitch MIDI</b> : clic droit &gt; <b>Settings</b> &gt; <b>MIDI footswitch latching</b> (par défaut) ou <b>toggles on each press</b>.",
+       ["Footswitch", "CC 24", "Chaque appui bascule marche / arrêt (par défaut, pour les footswitchs momentanés comme la M-Vave Chocolate) ou à accrochage (127 = on / 0 = off)"]],
+ midi2=["<b>Mode du footswitch MIDI</b> : clic droit &gt; <b>Settings</b> &gt; <b>MIDI footswitch: each press toggles on / off</b> (par défaut : un appui = marche, l'appui suivant = arrêt, inutile de maintenir) ou <b>MIDI footswitch latching (127 = on / 0 = off)</b> pour les footswitchs à accrochage.",
         "<b>Pédales d'expression</b> sur RATE ou DEPTH : mouvement lissé (rampe entre deux messages, puis lissage à 2 pôles), CC 14 bits accepté, course apprise automatiquement (0 et 100 % atteints même si la pédale n'envoie que 2-116) et petites zones mortes aux butées. Une pédale sur RATE en Env P règle l'amplitude du bend en temps réel.",
         "<b>Program Change</b> 1 à 15 : presets d'usine."],
  win_t="8. Fenêtre et écran",

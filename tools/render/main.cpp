@@ -112,6 +112,11 @@ int main (int argc, char** argv)
         std::printf ("pedale 2..116 -> rate %.2f / %.2f, mi-course %.2f\n", a, c, mid);
         sendCC (22, 127); std::printf ("CC 22 = 127 -> mode %d (attendu 7)\n", (int) proc.raw ("mode"));
         sendCC (22, 0);   std::printf ("CC 22 = 0   -> mode %d (attendu 0)\n", (int) proc.raw ("mode"));
+        // footswitch MIDI momentane (127 a l'appui, 0 au relachement) : chaque appui bascule, sans maintenir
+        proc.setParamValue ("active", 0.0f); pump (3);
+        sendCC (24, 127); sendCC (24, 0); const bool on1 = proc.raw ("active") > 0.5f;
+        sendCC (24, 127); sendCC (24, 0); const bool on2 = proc.raw ("active") > 0.5f;
+        std::printf ("footswitch MIDI : 1er appui -> %s, 2e appui -> %s (attendu ON puis OFF)\n", on1 ? "ON" : "OFF", on2 ? "ON" : "OFF");
     }
     ed.reset();
     return 0;

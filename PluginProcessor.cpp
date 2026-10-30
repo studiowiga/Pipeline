@@ -98,7 +98,7 @@ AudioProcessorValueTreeState::ParameterLayout PipelineAudioProcessor::createLayo
     p.push_back (std::make_unique<AudioParameterBool>   (ParameterID { "active", 1 }, "Footswitch", true));
     p.push_back (std::make_unique<AudioParameterBool>   (ParameterID { "flexi", 1 }, "Flexi-Switch (hold = momentary)", true));
     p.push_back (std::make_unique<AudioParameterChoice> (ParameterID { "midiFsMode", 1 }, "MIDI Footswitch Mode",
-                                                         StringArray { "Latching (127 / 0)", "Toggle each press" }, 0));
+                                                         StringArray { "Toggle each press", "Latching (127 / 0)" }, 0));   // defaut : un appui = marche / arret
     return { p.begin(), p.end() };
 }
 
@@ -165,7 +165,7 @@ float PipelineAudioProcessor::mapCC (int k, float raw01)
 
 void PipelineAudioProcessor::handleMidi (MidiBuffer& midi)
 {
-    const bool latching = rawAt (rMidiFs) < 0.5f;
+    const bool latching = rawAt (rMidiFs) > 0.5f;    // par defaut (0) : chaque appui bascule marche / arret
     for (const auto meta : midi)
     {
         const auto m = meta.getMessage();

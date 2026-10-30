@@ -37,8 +37,9 @@ lum = lambda a: a.mean(-1)
 RATE_C, DEPTH_C, MODE_C = (383.0, 292.0), (735.0, 292.0), (559.0, 583.0)
 CAP_R, SKIRT_R = 54.0, 72.0
 MODE_CAP_R, MODE_SKIRT_R = 35.0, 50.0
-FOOT_CAP = (558.5, 1237.0)               # centre du bouton du footswitch (dessus)
+FOOT_CAP = (558.5, 1237.0)               # centre du bouton du footswitch du visuel (vu en perspective)
 FOOT_NUT_R = 74.0
+FOOT_HOLE = (559.0, 1236.0, 84.0)        # footswitch du visuel retire (centre, rayon, ombre comprise)
 DISPLAY = (287, 903, 833, 1060)
 ROW = (300.0, 922.0, 820.0, 990.0)       # ligne d'etat (texte bleu)
 BAR = (308.0, 998.0, 808.0, 1046.0)      # barre de presets (cadre garde)
@@ -51,7 +52,8 @@ LED_NEW = (558.0, 124.0)
 # bloc du footswitch rigide, bande sous le footswitch un peu etiree (place du logo), puis tout remonte de 20 px
 # bande de la LED (1062-1144) : 44 lignes retirees par « seam carving » (lignes de moindre energie : les bulles et les
 # vagues gardent leur forme, pas d'ecrasement) -> footswitch remonte de 44 px ; sous le footswitch, bande du logo etiree
-BAND0, BAND1, CARVE = 1062, 1158, 72
+BAND0, BAND1, CARVE = 1062, 1144, 44
+FOOT_UP = 28                                    # footswitch d'Echoflex pose 28 px plus haut que l'ancien
 UNDER0, UNDER1, UNDER_DST = 1306, 1326, 26      # 20 lignes sous le footswitch -> 26 (place du logo)
 LOGO_DST_BOTTOM = None                          # calcule apres le remappage (6 px au-dessus du filet)
 TITLE_Y = 787.0                                 # centre du titre PIPELINE : niveau des jacks et des textes IN / OUT
@@ -232,7 +234,9 @@ def clean_knob(img, c, r_clear, r_zone, shift):
     corr = reg * gw + (fit - lowReal * gw) * w[..., None]
     # ombre profonde (pres du potard) : la photo n'a plus d'information utile -> facade modelisee + grain
     gl = cv2.GaussianBlur(lum(fit) / np.maximum(lum(lowReal), 1.0), (0, 0), 4)
-    deep = (np.clip((gl - 1.25) / 0.6, 0, 1) * w * (1 - np.clip((L - lum(fit) - 22.0) / 20.0, 0, 1)))[..., None]
+    feat = np.clip((L - lum(fit) - 18.0) / 18.0, 0, 1)
+    feat = cv2.GaussianBlur(cv2.dilate(feat, np.ones((7, 7), np.uint8)), (0, 0), 1.5)        # bulles entieres (bords compris)
+    deep = (np.clip((gl - 1.25) / 0.6, 0, 1) * w * (1 - np.clip(feat * 1.5, 0, 1)))[..., None]
     corr = corr * (1 - deep) + (fit + grain(reg.shape)) * deep
     # disque du potard et des graduations : facade modelisee + grain (le plugin y dessine le potard et les traits)
     inner = np.clip((r_clear - d0) / 4.0, 0, 1)[..., None]
@@ -276,7 +280,7 @@ paste_delta(plate, 'rlab', 0, D_KNOBS)
 paste_delta(plate, 'dlab', 0, D_KNOBS)
 
 # textes IN / OUT : effaces a leur place (matte blanc garde) pour etre recolles au niveau du titre
-IO_BOX = {'out': (236, 434, 278, 462), 'in': (858, 434, 880, 462)}
+IO_BOX = {'out': (241, 434, 278, 462), 'in': (852, 432, 877, 464)}   # sans le filet du cadre
 IO_ALPHA = {}
 for k, (x0, y0, x1, y1) in IO_BOX.items():
     reg = plate[y0:y1, x0:x1].copy()
@@ -286,6 +290,26 @@ for k, (x0, y0, x1, y1) in IO_BOX.items():
     plate[y0:y1, x0:x1] = np.where(m[..., None] > 0, bg + grain(bg.shape, 1.5), reg)
 wb = BOXES['word']
 paste_delta(plate, 'word', 0, int(round(MODE_WORD_NEW_Y - (wb[1] + wb[3]) / 2)))
+
+# footswitch du visuel (vu en perspective) retire : vagues reprises a cote, sur les memes lignes (meilleur raccord)
+def remove_footswitch(img):
+    cx, cy, r = FOOT_HOLE
+    R = int(r + 26)
+    y0, y1, x0, x1 = int(cy - R), int(cy + R), int(cx - R), int(cx + R)
+    gy, gx = np.mgrid[y0:y1, x0:x1].astype(np.float32)
+    d = np.hypot(gx - cx, gy - cy)
+    ring = (d > r) & (d < r + 22)
+    best, bestErr = None, 1e18
+    for dx in list(range(-330, -170, 6)) + list(range(170, 330, 6)):
+        if x0 + dx < 250 or x1 + dx > 868: continue
+        donor = img[y0:y1, x0 + dx:x1 + dx]
+        err = ((donor - img[y0:y1, x0:x1]) ** 2).sum(-1)[ring].mean()
+        if err < bestErr: best, bestErr = dx, err
+    donor = img[y0:y1, x0 + best:x1 + best]
+    m = np.clip((r + 10 - d) / 12.0, 0, 1)[..., None]
+    img[y0:y1, x0:x1] = img[y0:y1, x0:x1] * (1 - m) + donor * m
+    return best
+FOOT_DONOR = remove_footswitch(plate)
 
 # ------------------------------------------------------------------ 4. footswitch remonte : seam carving dans la bande de la LED
 def carve_rows(img, n):
@@ -339,8 +363,8 @@ for k, (x0, y0, x1, y1) in IO_BOX.items():
     dx = 7 if k == 'out' else -2                          # un peu d'air entre le texte et le filet du cadre
     x0, x1 = x0 + dx, x1 + dx
     reg = P2[ny:ny + (y1 - y0), x0:x1]
-    halo = cv2.GaussianBlur(cv2.dilate(a_, np.ones((3, 3), np.uint8)), (0, 0), 1.6)
-    reg = reg * (1 - 0.45 * np.clip(halo * 1.6, 0, 1))[..., None]
+    sh_ = np.roll(np.roll(cv2.GaussianBlur(a_, (0, 0), 0.8), 1, 0), 1, 1)          # fine ombre portee, pas de halo
+    reg = reg * (1 - 0.40 * sh_ * (1 - a_))[..., None]
     P2[ny:ny + (y1 - y0), x0:x1] = reg * (1 - a_[..., None]) + np.array([236, 238, 236], np.float32) * a_[..., None]
 
 # ------------------------------------------------------------------ 4b. pedale un peu plus large : interieur etire de 28 px
@@ -397,6 +421,17 @@ draw_ticks((RATE_C[0], RATE_C[1] + D_KNOBS), *TICK_RATE, [-150 + 30 * i for i in
 draw_ticks((DEPTH_C[0], DEPTH_C[1] + D_KNOBS), *TICK_RATE, [-150 + 30 * i for i in range(11)], 2.6)
 draw_ticks(MODE_C, *TICK_MODE, [-150 + 300.0 / 7.0 * i for i in range(8)], 2.6)
 
+# ------------------------------------------------------------------ 5a'. footswitch d'ECHOFLEX (vue de dessus, photo detouree, ombres comprises)
+FOOT_NEW = (FOOT_HOLE[0], to_dst(FOOT_HOLE[1]) - FOOT_UP)
+fsimg = Image.open(os.path.join(HERE, 'fs_echoflex.png')).convert('RGBA')
+fsc = (FOOT_NUT_R * 2.0 * SY) / 247.0                    # 247 px = largeur de l'ecrou dans le sprite
+fsimg = fsimg.resize((round(fsimg.width * fsc), round(fsimg.height * fsc)), Image.LANCZOS)
+fa = np.asarray(fsimg).astype(np.float32) / 255
+fcx, fcy = T(FOOT_NEW)
+ox, oy = int(round(fcx - 199.5 * fsc)), int(round(fcy - 198.0 * fsc))
+h_, w_ = fa.shape[:2]
+canvas[oy:oy + h_, ox:ox + w_] = canvas[oy:oy + h_, ox:ox + w_] * (1 - fa[..., 3:]) + fa[..., :3] * 255 * fa[..., 3:]
+
 # ------------------------------------------------------------------ 5b. jacks : embases chromees de Holyverb (OUT a gauche, IN a droite)
 def paste_sprite(img, x0, y0):
     global canvas
@@ -437,6 +472,18 @@ lensOff = np.array([8, 20, 38], np.float32) * (0.55 + 0.45 * np.clip(1 - d / LEN
 dome = np.exp(-(((XX - lx + LENS * 0.33) / (LENS * 0.26)) ** 2 + ((YY - ly + LENS * 0.38) / (LENS * 0.20)) ** 2)) * 125
 lensOff = lensOff + dome[..., None]
 canvas = canvas * (1 - lens[..., None]) + lensOff * lens[..., None]
+
+# fond derriere la pedale assombri (mur), la pedale et ses jacks ne changent pas
+_f = np.clip(canvas, 0, 255).astype(np.int16)
+_blue = ((_f[..., 2] - _f[..., 0]) > 22).astype(np.uint8)
+_blue = cv2.morphologyEx(_blue, cv2.MORPH_CLOSE, np.ones((15, 15), np.uint8))
+_c, _ = cv2.findContours(_blue, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+_ped = np.zeros((H2F, W2F), np.uint8); cv2.drawContours(_ped, [max(_c, key=cv2.contourArea)], -1, 255, -1)
+for (x0_, y0_), a_ in ((JL, aL), (JR, aR)):
+    hh, ww = a_.shape
+    _ped[y0_:y0_ + hh, x0_:x0_ + ww] = np.maximum(_ped[y0_:y0_ + hh, x0_:x0_ + ww], (a_ * 255).astype(np.uint8))
+_ped = cv2.GaussianBlur(cv2.dilate(_ped, np.ones((3, 3), np.uint8)).astype(np.float32) / 255, (0, 0), 1.0)
+canvas = canvas * (1 - (1 - _ped) * 0.52)[..., None]
 
 out = np.clip(canvas, 0, 255).astype(np.uint8)
 Image.fromarray(out).save(os.path.join(ROOT, 'background.jpg'), quality=93, subsampling=0)
@@ -479,11 +526,11 @@ Image.fromarray(SIL).save(os.path.join(HERE, 'pedal_mask.png'))
 k = 958.0 / HC
 rate, depth = U((RATE_C[0], RATE_C[1] + D_KNOBS)), U((DEPTH_C[0], DEPTH_C[1] + D_KNOBS))
 mode = U(MODE_C)
-led, foot = U(LED_NEW), U((FOOT_CAP[0], to_dst(FOOT_CAP[1])))
+led, foot = U(LED_NEW), U(FOOT_NEW)
 def R(b): p0, p1 = U((b[0], b[1])), U((b[2], b[3])); return [round(p0[0], 2), round(p0[1], 2), round(p1[0] - p0[0], 2), round(p1[1] - p0[1], 2)]
 info = {
     'rate': rate, 'depth': depth, 'mode': mode, 'knobTop': CAP_R * k, 'knobSkirt': SKIRT_R * k,
-    'modeTop': MODE_CAP_R * k, 'modeSkirt': MODE_SKIRT_R * k, 'led': led, 'foot': foot, 'footR': FOOT_NUT_R * k,
+    'modeTop': MODE_CAP_R * k, 'modeSkirt': MODE_SKIRT_R * k, 'led': led, 'foot': foot, 'footR': FOOT_NUT_R * k * 0.92,
     'ledLensR': LENS / 2, 'glowRect': [x0 / 2, y0 / 2, RAD, RAD], 'row': R(ROW), 'bar': R(BAR), 'display': R(DISPLAY),
     'crop': [CX0, CY0, WC, HC],
 }
