@@ -17,7 +17,7 @@ namespace
     float knobAngle (float v) { return degreesToRadians (rotStart + (rotEnd - rotStart) * jlimit (0.0f, 10.0f, v) / 10.0f); }
     float modeAngle (int p)   { return degreesToRadians (layout::modeFirstDeg + layout::modeStepDeg * (float) jlimit (0, 7, p)); }
 
-    const Colour inkWhite (0xffdfe6ea), lcd (0xff8fdcff);       // texte de l'ecran : bleu glace (comme la LED)
+    const Colour inkWhite (0xffd8dad9), lcd (0xffa2d4ec);       // couleurs des textes de l'ecran du visuel
 
     const char* const valueIds[] = { "rate", "depth", "mode", "sync", "active", "flexi" };
     constexpr int numValueIds = 6;
@@ -508,9 +508,10 @@ void PipelineAudioProcessorEditor::drawLed (Graphics& g)
 
 void PipelineAudioProcessorEditor::drawKnobs (Graphics& g)
 {
-    paintPointer (g, layout::ratePos,  layout::knobTop, knobAngle (rateKnob.getValue()),  0.18f, 0.88f, 4.6f);
-    paintPointer (g, layout::depthPos, layout::knobTop, knobAngle (depthKnob.getValue()), 0.18f, 0.88f, 4.6f);
-    paintPointer (g, layout::modePos,  layout::modeTop, modeKnob.getShownAngle(),         0.16f, 0.86f, 4.0f);
+    // reperes du visuel : du centre du chapeau vers son bord, gris clair a bouts arrondis
+    paintPointer (g, layout::ratePos,  layout::knobTop, knobAngle (rateKnob.getValue()),  0.06f, 0.90f, 4.0f);
+    paintPointer (g, layout::depthPos, layout::knobTop, knobAngle (depthKnob.getValue()), 0.06f, 0.90f, 4.0f);
+    paintPointer (g, layout::modePos,  layout::modeTop, modeKnob.getShownAngle(),         0.06f, 0.92f, 3.8f);
 }
 
 void PipelineAudioProcessorEditor::drawFootswitch (Graphics& g)
