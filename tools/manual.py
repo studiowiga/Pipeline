@@ -16,7 +16,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SHOTS = sys.argv[1]
 OUT = sys.argv[2]
-VERSION = "1.4.2"
+VERSION = "1.4.3"
 TMP = os.path.dirname(os.path.abspath(OUT))
 FONTS = os.path.join(ROOT, "assets", "fonts")
 
@@ -38,7 +38,7 @@ src = shot("pipeline_full.png")
 ann = src.copy(); dr = ImageDraw.Draw(ann)
 fnt = ImageFont.truetype(os.path.join(FONTS, "Poppins-Bold.ttf"), 30)
 marks = [  # numero, x, y (unites)
-    (1, 164, 134), (2, 600, 134), (3, 470, 318), (4, 612, 701), (5, 612, 751),
+    (1, 164, 124), (2, 600, 124), (3, 470, 300), (4, 612, 701), (5, 612, 751),
     (6, 420, 70), (7, 462, 860), (8, 72, 520), (9, 690, 520)]
 for n, x, y in marks:
     cx, cy, r = x * K, y * K, 24
@@ -56,8 +56,8 @@ def strip(images, path, gap=16):
     for i in images: s.paste(i, (x, 0)); x += i.width + gap
     s.save(path); return path
 
-knobs_img = strip([crop_u(shot("pipeline_full.png"), (150, 112, 610, 296))], os.path.join(TMP, "pipeline_knobs.png"))
-mode_img = strip([crop_u(shot("pipeline_full.png"), (232, 296, 530, 506)), crop_u(shot("pipeline_envp.png"), (232, 296, 530, 506))],
+knobs_img = strip([crop_u(shot("pipeline_full.png"), (150, 90, 610, 290))], os.path.join(TMP, "pipeline_knobs.png"))
+mode_img = strip([crop_u(shot("pipeline_full.png"), (214, 266, 548, 490)), crop_u(shot("pipeline_envp.png"), (214, 266, 548, 490))],
                  os.path.join(TMP, "pipeline_mode.png"))
 fs_img = strip([crop_u(shot("pipeline_bypass.png"), (316, 778, 446, 904)), crop_u(shot("pipeline_full.png"), (316, 778, 446, 904)),
                 crop_u(shot("pipeline_pressed.png"), (316, 778, 446, 904))], os.path.join(TMP, "pipeline_fs.png"))

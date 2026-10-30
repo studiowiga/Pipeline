@@ -45,8 +45,9 @@ ROW = (300.0, 922.0, 820.0, 990.0)       # ligne d'etat (texte bleu)
 BAR = (308.0, 998.0, 808.0, 1046.0)      # barre de presets (cadre garde)
 LOGO_BOX = (455, 1302, 664, 1325)
 
-D_KNOBS = 26                              # potards (et leurs graduations / etiquettes) abaisses
-MODE_WORD_NEW_Y = 441.0
+D_KNOBS = 12                              # potards (et leurs graduations / etiquettes) : remontes (v1.4.3)
+MODE_DY = -16                             # bloc MODE (selecteur, crans, etiquettes, mot MODE) remonte (v1.4.3)
+MODE_WORD_NEW_Y = 441.0 - 16.0 - 10.0
 LED_NEW = (558.0, 124.0)
 # remappage du bas (destination <- source) : identite jusqu'a l'ecran, bande de la LED resserree,
 # bloc du footswitch rigide, bande sous le footswitch un peu etiree (place du logo), puis tout remonte de 20 px
@@ -252,13 +253,11 @@ clean_knob(plate, MODE_C, KNOB_OF['mode'][2], 112.0, (20.0, 26.0))
 # logo sur les vagues : lettres et anneaux effaces (inpainting), matte blanc conserve pour le recoller
 lx0, ly0, lx1, ly1 = LOGO_BOX
 lreg = plate[ly0 - 6:ly1 + 1, lx0:lx1].copy()
-lm = (lum(lreg) > 110).astype(np.uint8)
-lm[-2:] = 0                                               # lignes du filet du cadre : pas touchees
-lm = cv2.dilate(lm, np.ones((5, 5), np.uint8))
-lm[-1:] = 0
+lm = (lum(lreg) > 95).astype(np.uint8)                  # (le filet du cadre est sur la ligne 1326, hors de la zone)
+lm = cv2.dilate(lm, np.ones((7, 7), np.uint8))
+lm = np.maximum(lm, np.roll(np.roll(lm, 2, 0), 2, 1))     # avec la fine ombre du logo d'origine
 bgL = cv2.inpaint(np.clip(lreg, 0, 255).astype(np.uint8), lm, 3, cv2.INPAINT_TELEA).astype(np.float32)
 logo_alpha = np.clip((lum(lreg) - lum(bgL)) / np.maximum(235.0 - lum(bgL), 30.0), 0, 1) * (lm > 0)
-logo_alpha[-2:] = 0
 plate[ly0 - 6:ly1 + 1, lx0:lx1] = np.where(lm[..., None] > 0, bgL + grain(bgL.shape, 1.5), lreg)
 
 def col_fill(img, box, edge=4):
@@ -280,16 +279,22 @@ LBL_SCALE, LBL_PUSH = 1.30, 5.0
 LABELS = []
 mattes = []
 for (x0, y0, x1, y1) in LABELS_SRC:
-    X0, Y0, X1, Y1 = x0 - 3, y0 - 3, x1 + 3, y1 + 3
+    X0, Y0, X1, Y1 = x0 - 5, y0 - 5, x1 + 6, y1 + 6
     reg = plate[Y0:Y1, X0:X1].copy()
-    m = cv2.dilate((lum(reg) > 150).astype(np.uint8), np.ones((3, 3), np.uint8))
-    bg = cv2.inpaint(np.clip(reg, 0, 255).astype(np.uint8), m, 3, cv2.INPAINT_TELEA).astype(np.float32)
-    mattes.append(np.clip((lum(reg) - lum(bg)) / np.maximum(232.0 - lum(bg), 30.0), 0, 1) * (m > 0))
+    letters = (lum(reg) > 150).astype(np.uint8)
+    m1 = cv2.dilate(letters, np.ones((3, 3), np.uint8))
+    bg1 = cv2.inpaint(np.clip(reg, 0, 255).astype(np.uint8), m1, 3, cv2.INPAINT_TELEA).astype(np.float32)
+    mattes.append(np.clip((lum(reg) - lum(bg1)) / np.maximum(232.0 - lum(bg1), 30.0), 0, 1) * (m1 > 0))
+    # effacement : lettres + leur fine ombre portee (vers le bas a droite), sinon un fantome sombre reste visible
+    m = cv2.dilate(letters, np.ones((7, 7), np.uint8))
+    m = np.maximum(m, np.roll(np.roll(m, 2, 0), 2, 1))
+    bg = cv2.inpaint(np.clip(reg, 0, 255).astype(np.uint8), m, 4, cv2.INPAINT_TELEA).astype(np.float32)
+    bg = cv2.GaussianBlur(bg, (0, 0), 1.2)
     plate[Y0:Y1, X0:X1] = np.where(m[..., None] > 0, bg + grain(bg.shape, 1.5), reg)
 for (x0, y0, x1, y1), mt in zip(LABELS_SRC, mattes):
     cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
     dx, dy = cx - MODE_C[0], cy - MODE_C[1]; dn = math.hypot(dx, dy)
-    cx, cy = cx + dx / dn * LBL_PUSH, cy + dy / dn * LBL_PUSH
+    cx, cy = cx + dx / dn * LBL_PUSH, cy + dy / dn * LBL_PUSH + MODE_DY
     h0, w0 = mt.shape
     big = np.asarray(Image.fromarray((mt * 255).astype(np.uint8)).resize((round(w0 * LBL_SCALE), round(h0 * LBL_SCALE)), Image.LANCZOS)).astype(np.float32) / 255
     hh, ww = big.shape
@@ -306,8 +311,9 @@ def paste_delta(img, k, dx, dy):
     delta = (A[y0:y1, x0:x1] - FILL[k]) * ALPHA[k][..., None]
     img[y0 + dy:y1 + dy, x0 + dx:x1 + dx] += delta
 
-paste_delta(plate, 'rlab', 0, D_KNOBS)
-paste_delta(plate, 'dlab', 0, D_KNOBS)
+LABEL_UP = 12                                             # titres RATE / DEPTH / MODE eloignes des potards
+paste_delta(plate, 'rlab', 0, D_KNOBS - LABEL_UP)
+paste_delta(plate, 'dlab', 0, D_KNOBS - LABEL_UP)
 
 # textes IN / OUT : effaces a leur place (matte blanc garde) pour etre recolles au niveau du titre
 IO_BOX = {'out': (241, 434, 278, 462), 'in': (852, 432, 877, 464)}   # sans le filet du cadre
@@ -378,13 +384,25 @@ def to_dst(y):                                            # ligne source -> lign
     if y < UNDER0: return float(y - CARVE)
     if y < UNDER1: return UNDER0 - CARVE + (y - UNDER0) * UNDER_DST / (UNDER1 - UNDER0)
     return float(y - CARVE + UNDER_DST - (UNDER1 - UNDER0))
-LOGO_DST_BOTTOM = int(round(to_dst(1326))) - 6
+LOGO_DST_BOTTOM = int(round(to_dst(1326))) - 15     # anneaux du logo bien au-dessus du filet du cadre
 
 # logo recolle (blanc du visuel) au-dessus du filet
-la = logo_alpha
-ny0 = LOGO_DST_BOTTOM - la.shape[0] + 1 + 2
-reg = P2[ny0:ny0 + la.shape[0], lx0:lx1]
-P2[ny0:ny0 + la.shape[0], lx0:lx1] = reg * (1 - la[..., None]) + np.array([236, 238, 236], np.float32) * la[..., None]
+# logo du kit Studio Wiga (blanc net, a la taille du logo du visuel) au lieu du matte extrait : sur les rayures claires des
+# vagues le matte donnait des lettres grisees ; fine ombre portee pour rester lisible sur la vague claire
+_lg = Image.open(os.path.join(ROOT, 'assets', 'logo_studio_wiga_blanc.png')).convert('RGBA')
+_lg = _lg.crop(_lg.getbbox())
+LOGO_W = 196.0                                             # largeur du logo du visuel (anneaux + texte), px
+_lg = _lg.resize((int(round(LOGO_W)), int(round(LOGO_W * _lg.height / _lg.width))), Image.LANCZOS)
+la = np.asarray(_lg).astype(np.float32)[..., 3] / 255
+lh, lw = la.shape
+nx0 = int(round(560.0 - lw / 2))
+ny0 = LOGO_DST_BOTTOM - lh + 1
+pad = 4
+reg = P2[ny0 - pad:ny0 + lh + pad, nx0 - pad:nx0 + lw + pad]
+lap = np.pad(la, pad)
+sh = np.roll(np.roll(cv2.GaussianBlur(lap, (0, 0), 1.3), 1, 0), 1, 1)
+reg = reg * (1 - 0.45 * sh * (1 - lap))[..., None]
+P2[ny0 - pad:ny0 + lh + pad, nx0 - pad:nx0 + lw + pad] = reg * (1 - lap[..., None]) + np.array([240, 242, 240], np.float32) * lap[..., None]
 
 # textes IN / OUT au niveau du titre (leger halo sombre : lisibles sur l'ecume des vagues)
 for k, (x0, y0, x1, y1) in IO_BOX.items():
@@ -449,7 +467,7 @@ def draw_ticks(centre, r0, r1, angles, width):
 
 draw_ticks((RATE_C[0], RATE_C[1] + D_KNOBS), *TICK_RATE, [-150 + 30 * i for i in range(11)], 2.6)
 draw_ticks((DEPTH_C[0], DEPTH_C[1] + D_KNOBS), *TICK_RATE, [-150 + 30 * i for i in range(11)], 2.6)
-draw_ticks(MODE_C, *TICK_MODE, [-150 + 300.0 / 7.0 * i for i in range(8)], 3.6)
+draw_ticks((MODE_C[0], MODE_C[1] + MODE_DY), *TICK_MODE, [-150 + 300.0 / 7.0 * i for i in range(8)], 3.6)
 
 # ------------------------------------------------------------------ 5a'. footswitch d'ECHOFLEX (vue de dessus, photo detouree, ombres comprises)
 FOOT_NEW = (FOOT_HOLE[0], to_dst(FOOT_HOLE[1]) - FOOT_UP)
@@ -589,7 +607,7 @@ Image.fromarray(SIL).save(os.path.join(HERE, 'pedal_mask.png'))
 # ------------------------------------------------------------------ 6c. reperes pour le code (unites 760 x 958)
 k = 958.0 / HC
 rate, depth = U((RATE_C[0], RATE_C[1] + D_KNOBS)), U((DEPTH_C[0], DEPTH_C[1] + D_KNOBS))
-mode = U(MODE_C)
+mode = U((MODE_C[0], MODE_C[1] + MODE_DY))
 led, foot = U(LED_NEW), U(FOOT_NEW)
 def R(b): p0, p1 = U((b[0], b[1])), U((b[2], b[3])); return [round(p0[0], 2), round(p0[1], 2), round(p1[0] - p0[0], 2), round(p1[1] - p0[1], 2)]
 info = {
