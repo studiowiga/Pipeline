@@ -119,6 +119,24 @@ int main (int argc, char** argv)
         sendCC (24, 127); sendCC (24, 0); const bool on1 = proc.raw ("active") > 0.5f;
         sendCC (24, 127); sendCC (24, 0); const bool on2 = proc.raw ("active") > 0.5f;
         std::printf ("footswitch MIDI : 1er appui -> %s, 2e appui -> %s (attendu ON puis OFF)\n", on1 ? "ON" : "OFF", on2 ? "ON" : "OFF");
+        // selecteur a crans : glisser 40 px vers la droite = 2 crans (16 px par cran), position toujours entiere
+        {
+            Component* mk = nullptr;
+            for (auto* c : ed->getChildren()) if (dynamic_cast<ModeKnob*> (c) != nullptr) mk = c;
+            proc.setParamValue ("mode", 0.0f); pump (3);
+            auto src = Desktop::getInstance().getMainMouseSource();
+            const auto p0 = mk->getLocalBounds().getCentre().toFloat();
+            MouseEvent down (src, p0, ModifierKeys (ModifierKeys::leftButtonModifier), 1.0f, 0, 0, 0, 0, mk, mk, Time::getCurrentTime(), p0, Time::getCurrentTime(), 1, false);
+            mk->mouseDown (down);
+            for (int dx = 4; dx <= 40; dx += 4) mk->mouseDrag (down.withNewPosition (p0.translated ((float) dx, 0.0f)));
+            mk->mouseUp (down.withNewPosition (p0.translated (40.0f, 0.0f)));
+            pump (3);
+            std::printf ("selecteur : 40 px -> mode %d (attendu 2)\n", (int) proc.raw ("mode"));
+            mk->mouseDown (down);
+            for (int dx = -10; dx >= -400; dx -= 10) mk->mouseDrag (down.withNewPosition (p0.translated ((float) dx, 0.0f)));
+            mk->mouseUp (down); pump (3);
+            std::printf ("selecteur : butee basse -> mode %d (attendu 0)\n", (int) proc.raw ("mode"));
+        }
     }
     ed.reset();
     return 0;

@@ -51,8 +51,9 @@ private:
     juce::ParameterAttachment attachment;
     int pos = 0, dragStartPos = 0;
     float shownAngle = 0.0f, targetAngle = 0.0f;
-    // crans (butees) : le repere resiste un peu puis « tombe » dans le cran suivant avec un leger rebond
-    float lean = 0.0f, velocity = 0.0f;
+    // crans (comme Ring Think) : deplacement accumule, saut instantane d'un cran entier tous les 16 px
+    float accum = 0.0f;
+    juce::Point<float> lastDrag;
     bool dragging = false;
 };
 

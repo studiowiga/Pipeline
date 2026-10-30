@@ -128,35 +128,27 @@ void ModeKnob::moveTo (int p)
 void ModeKnob::mouseDown (const MouseEvent& e)
 {
     if (e.mods.isPopupMenu()) { if (onRightClick) onRightClick(); return; }
-    dragStartPos = pos;
     dragging = true;
+    accum = 0.0f;
+    lastDrag = e.position;
 }
 
-// Selecteur a crans : 40 px de deplacement par cran. Entre deux crans le repere ne suit la souris que d'un tiers de cran
-// (resistance du ressort) ; au-dela de la moitie du chemin + 10 % (hysteresis), il bascule dans le cran suivant.
-// Aux extremites (SINE / ENV P) la butee bloque : le repere ne depasse que de quelques degres.
+// Selecteur a crans, comme le gros potard de Ring Think : le deplacement de la souris s'accumule et chaque tranche de
+// 16 px fait sauter le repere d'un cran entier, instantanement (aucune position intermediaire, aucun glissement).
+// Aux extremites (SINE / ENV P) il reste en butee.
 void ModeKnob::mouseDrag (const MouseEvent& e)
 {
     if (! dragging) return;
-    constexpr float pxPerStep = 40.0f;
-    const float raw = (float) dragStartPos + (float) (e.getDistanceFromDragStartX() - e.getDistanceFromDragStartY()) / pxPerStep;
-    int np = pos;
-    if (raw > (float) pos + 0.60f) np = (int) std::floor (raw + 0.40f);
-    else if (raw < (float) pos - 0.60f) np = (int) std::ceil (raw - 0.40f);
-    np = jlimit (0, 7, np);
-    if (np != pos) moveTo (np);
-    float off = raw - (float) pos;
-    if ((pos == 0 && off < 0.0f) || (pos == 7 && off > 0.0f))
-        off = 0.12f * std::tanh (off * 2.0f);                           // butee de fin de course
-    else
-        off = 0.33f * std::tanh (off * 1.8f);                           // resistance du cran
-    lean = degreesToRadians (layout::modeStepDeg) * off;
+    constexpr float pxPerStep = 16.0f;
+    accum += (e.position.x - lastDrag.x) - (e.position.y - lastDrag.y);
+    lastDrag = e.position;
+    while (accum >=  pxPerStep) { accum -= pxPerStep; if (pos < 7) moveTo (pos + 1); else accum = 0.0f; }
+    while (accum <= -pxPerStep) { accum += pxPerStep; if (pos > 0) moveTo (pos - 1); else accum = 0.0f; }
 }
 
 void ModeKnob::mouseUp (const MouseEvent&)
 {
     dragging = false;
-    lean = 0.0f;                                                       // le ressort ramene le repere au centre du cran
 }
 
 void ModeKnob::mouseWheelMove (const MouseEvent&, const MouseWheelDetails& w)
@@ -166,17 +158,9 @@ void ModeKnob::mouseWheelMove (const MouseEvent&, const MouseWheelDetails& w)
 
 bool ModeKnob::tick()
 {
-    // ressort amorti (30 Hz) : passage rapide d'un cran a l'autre avec un petit depassement, comme un vrai cran
-    const float goal = targetAngle + lean;
-    const float d = goal - shownAngle;
-    if (std::abs (d) < 0.0015f && std::abs (velocity) < 0.0015f)
-    {
-        velocity = 0.0f;
-        if (shownAngle != goal) { shownAngle = goal; return true; }
-        return false;
-    }
-    velocity = velocity * 0.25f + d * 0.55f;          // ~6 % de depassement, pose en ~150 ms
-    shownAngle += velocity;
+    // aucun glissement : le repere est dessine directement sur le cran (redessin seulement quand il change)
+    if (shownAngle == targetAngle) return false;
+    shownAngle = targetAngle;
     return true;
 }
 
