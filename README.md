@@ -30,7 +30,7 @@ JUCE 8.0.15 ; rendu logiciel forcé sous Windows (réappliqué à chaque nouvell
 - `tools/make_background.py` : fond tiré du visuel (repères effacés, éléments déplacés), calque de la LED, `Layout.h`.
 - `tools/render/` : compile la vraie fenêtre sous Linux et exporte les captures ; `tools/manual.py` : notice PDF.
 - `tests/test_dsp.cpp` : banc d'essai du moteur (hauteur mesurée par mode, crêtes, bypass exact).
-- `docs/Pipeline_Manual_EN-FR_v1.3.0.pdf` : notice bilingue.
+- `docs/Pipeline_Manual_EN-FR_v1.3.1.pdf` : notice bilingue.
 
 ## Compilation
 
@@ -41,6 +41,7 @@ Le workflow GitHub `build.yml` produit les artefacts `Pipeline-VST3-Windows` et 
 
 ## Historique
 
+- **1.3.1** : ombres et cercles des anciens potards supprimés, graduations redessinées (dont ENV R / ENV P), jacks et IN / OUT au niveau du titre, footswitch remonté sans déformer les vagues, écran nettoyé.
 - **1.3.0** : potards moletés et embases jack de Holyverb, potards encore abaissés, pédale élargie.
 - **1.2.0** : nouveau visuel « vagues » avec les mêmes retouches (hauteur réduite, potards abaissés, LED en haut, footswitch et logo remontés, MODE au-dessus du sélecteur) ; pédale agrandie dans la fenêtre (marges réduites, taille de fenêtre inchangée).
 - **1.1.0** : visuel définitif de Studio Wiga intégré et retouché (hauteur réduite, potards abaissés, LED en haut, footswitch Echoflex et logo remontés, MODE au-dessus du sélecteur).

@@ -16,7 +16,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SHOTS = sys.argv[1]
 OUT = sys.argv[2]
-VERSION = "1.3.0"
+VERSION = "1.3.1"
 TMP = os.path.dirname(os.path.abspath(OUT))
 FONTS = os.path.join(ROOT, "assets", "fonts")
 
@@ -38,8 +38,8 @@ src = shot("pipeline_full.png")
 ann = src.copy(); dr = ImageDraw.Draw(ann)
 fnt = ImageFont.truetype(os.path.join(FONTS, "Poppins-Bold.ttf"), 30)
 marks = [  # numero, x, y (unites)
-    (1, 168, 128), (2, 596, 128), (3, 470, 300), (4, 606, 677), (5, 606, 725),
-    (6, 420, 68), (7, 462, 862), (8, 80, 300), (9, 680, 300)]
+    (1, 164, 134), (2, 600, 134), (3, 470, 318), (4, 612, 701), (5, 612, 751),
+    (6, 420, 70), (7, 462, 860), (8, 72, 520), (9, 690, 520)]
 for n, x, y in marks:
     cx, cy, r = x * K, y * K, 24
     dr.ellipse((cx - r, cy - r, cx + r, cy + r), fill=(255, 255, 255), outline=ACC_RGB, width=5)
@@ -56,13 +56,13 @@ def strip(images, path, gap=16):
     for i in images: s.paste(i, (x, 0)); x += i.width + gap
     s.save(path); return path
 
-knobs_img = strip([crop_u(shot("pipeline_full.png"), (160, 110, 600, 290))], os.path.join(TMP, "pipeline_knobs.png"))
-mode_img = strip([crop_u(shot("pipeline_full.png"), (272, 290, 490, 492)), crop_u(shot("pipeline_envp.png"), (290, 312, 470, 492))],
+knobs_img = strip([crop_u(shot("pipeline_full.png"), (150, 112, 610, 300))], os.path.join(TMP, "pipeline_knobs.png"))
+mode_img = strip([crop_u(shot("pipeline_full.png"), (262, 300, 504, 502)), crop_u(shot("pipeline_envp.png"), (262, 300, 504, 502))],
                  os.path.join(TMP, "pipeline_mode.png"))
-fs_img = strip([crop_u(shot("pipeline_bypass.png"), (312, 800, 448, 918)), crop_u(shot("pipeline_full.png"), (312, 800, 448, 932)),
-                crop_u(shot("pipeline_pressed.png"), (312, 800, 448, 918))], os.path.join(TMP, "pipeline_fs.png"))
-disp_img = strip([crop_u(shot(p), (176, 632, 586, 760)) for p in ("pipeline_full.png", "pipeline_envp.png")], os.path.join(TMP, "pipeline_disp.png"), gap=10)
-disp2_img = strip([crop_u(shot(p), (176, 632, 586, 760)) for p in ("pipeline_status.png", "pipeline_sync.png")], os.path.join(TMP, "pipeline_disp2.png"), gap=10)
+fs_img = strip([crop_u(shot("pipeline_bypass.png"), (312, 796, 448, 914)), crop_u(shot("pipeline_full.png"), (312, 796, 448, 914)),
+                crop_u(shot("pipeline_pressed.png"), (312, 796, 448, 914))], os.path.join(TMP, "pipeline_fs.png"))
+disp_img = strip([crop_u(shot(p), (170, 660, 592, 784)) for p in ("pipeline_full.png", "pipeline_envp.png")], os.path.join(TMP, "pipeline_disp.png"), gap=10)
+disp2_img = strip([crop_u(shot(p), (170, 660, 592, 784)) for p in ("pipeline_status.png", "pipeline_sync.png")], os.path.join(TMP, "pipeline_disp2.png"), gap=10)
 
 # ---------- couverture : pedale detouree, reflet au sol, halo bleu tres doux ----------
 cov = shot("pipeline_full.png")
