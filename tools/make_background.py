@@ -58,7 +58,8 @@ UNDER0, UNDER1, UNDER_DST = 1306, 1326, 26      # 20 lignes sous le footswitch -
 LOGO_DST_BOTTOM = None                          # calcule apres le remappage (6 px au-dessus du filet)
 TITLE_Y = 787.0                                 # centre du titre PIPELINE : niveau des jacks et des textes IN / OUT
 TICK_RATE = (83.0, 94.0)                        # graduations des potards (rayons interieur / exterieur, px du visuel)
-TICK_MODE = (62.0, 73.0)
+TICK_MODE = (66.0, 84.0)                        # crans du selecteur plus longs et plus epais (potard agrandi)
+MODE_ERASE_R = 77.0                             # crans du visuel a effacer (rayon exterieur 73)
 
 # ------------------------------------------------------------------ 1. reperes des potards et textes de l'ecran
 def erase_pointer(c, r):
@@ -141,7 +142,7 @@ def row_fill(img, box, edge=8):
 BOXES = {'rlab': (340, 166, 426, 198), 'dlab': (686, 166, 786, 198),     # etiquettes RATE / DEPTH (descendent avec les potards)
          'word': (516, 690, 602, 726), 'led': (486, 1068, 634, 1146)}
 KNOB_OF = {'rate': (RATE_C, SKIRT_R, TICK_RATE[1] + 4.0), 'depth': (DEPTH_C, SKIRT_R, TICK_RATE[1] + 4.0),
-           'mode': (MODE_C, MODE_SKIRT_R, TICK_MODE[1] + 4.0)}
+           'mode': (MODE_C, MODE_SKIRT_R, MODE_ERASE_R)}
 FILL, ALPHA = {}, {}
 plate = A.copy()
 for k, (x0, y0, x1, y1) in BOXES.items():
@@ -419,7 +420,7 @@ def draw_ticks(centre, r0, r1, angles, width):
 
 draw_ticks((RATE_C[0], RATE_C[1] + D_KNOBS), *TICK_RATE, [-150 + 30 * i for i in range(11)], 2.6)
 draw_ticks((DEPTH_C[0], DEPTH_C[1] + D_KNOBS), *TICK_RATE, [-150 + 30 * i for i in range(11)], 2.6)
-draw_ticks(MODE_C, *TICK_MODE, [-150 + 300.0 / 7.0 * i for i in range(8)], 2.6)
+draw_ticks(MODE_C, *TICK_MODE, [-150 + 300.0 / 7.0 * i for i in range(8)], 3.6)
 
 # ------------------------------------------------------------------ 5a'. footswitch d'ECHOFLEX (vue de dessus, photo detouree, ombres comprises)
 FOOT_NEW = (FOOT_HOLE[0], to_dst(FOOT_HOLE[1]) - FOOT_UP)
@@ -455,7 +456,7 @@ aR = paste_sprite(ji, *JR)
 YY, XX = np.mgrid[0:H2F, 0:W2F].astype(np.float32)
 lx, ly = T(LED_NEW)
 d = np.hypot(XX - lx, YY - ly)
-RING, LENS = 13.6 * SX, 9.0 * SX
+RING, LENS = 19.5 * SX, 13.0 * SX                    # LED agrandie
 sh = cv2.GaussianBlur((np.hypot(XX - lx - 3, YY - ly - 4) < RING).astype(np.float32), (0, 0), 3.5)
 canvas *= (1 - 0.45 * sh * (d >= RING - 1))[..., None]
 ang = np.arctan2(YY - ly, XX - lx)
@@ -488,6 +489,38 @@ canvas = canvas * (1 - (1 - _ped) * 0.52)[..., None]
 out = np.clip(canvas, 0, 255).astype(np.uint8)
 Image.fromarray(out).save(os.path.join(ROOT, 'background.jpg'), quality=93, subsampling=0)
 
+# ------------------------------------------------------------------ 6a'. etiquettes du selecteur allumees en bleu (ecriture LED)
+# une image par mode (ordre du parametre : SINE, TRI, RAMP, SQR, RAND, ENV D, ENV R, ENV P), toutes de meme taille,
+# centrees sur l'etiquette : coeur bleu tres clair + halo bleu ; le plugin affiche celle du mode choisi en fondu
+LABELS = [(487, 668, 523, 684), (436, 609, 460, 625), (433, 524, 477, 540), (505, 474, 534, 490),
+          (577, 474, 618, 490), (641, 524, 687, 540), (647, 609, 693, 625), (590, 668, 635, 684)]
+LBL_PAD = 16
+boxes = []
+for (x0_, y0_, x1_, y1_) in LABELS:
+    ax, ay = T((x0_ - 2, y0_ - 2)); bx, by = T((x1_ + 2, y1_ + 2))
+    boxes.append((ax, ay, bx, by))
+FW = int(math.ceil(max(b[2] - b[0] for b in boxes) + 2 * LBL_PAD)); FH = int(math.ceil(max(b[3] - b[1] for b in boxes) + 2 * LBL_PAD))
+lstrip = np.zeros((FH * 8, FW, 4), np.float32)
+LBL_C = []
+for i, (ax, ay, bx, by) in enumerate(boxes):
+    cx_, cy_ = (ax + bx) / 2, (ay + by) / 2
+    X0, Y0 = int(round(cx_ - FW / 2)), int(round(cy_ - FH / 2))
+    reg = out[Y0:Y0 + FH, X0:X0 + FW].astype(np.float32)
+    Lr = reg.mean(-1)
+    inb = np.zeros((FH, FW), bool)
+    inb[int(ay - Y0):int(by - Y0) + 1, int(ax - X0):int(bx - X0) + 1] = True
+    face = np.median(Lr[inb & (Lr < 140)]) if (inb & (Lr < 140)).any() else 75.0
+    ta = np.clip((Lr - face - 25.0) / (215.0 - face), 0, 1) * inb                 # lettres blanches de l'etiquette
+    g1 = cv2.GaussianBlur(ta, (0, 0), 2.2); g2 = cv2.GaussianBlur(ta, (0, 0), 6.0)
+    glowA = np.clip(g1 * 1.4 + g2 * 1.1, 0, 1)
+    core = np.array([165, 222, 255], np.float32); blueC = np.array([40, 150, 255], np.float32)
+    a_ = np.clip(np.maximum(ta, glowA * 0.75), 0, 1)
+    rgb = (core * ta[..., None] + blueC * (glowA * 0.75 * (1 - ta))[..., None]) / np.maximum(a_[..., None], 1e-4)
+    lstrip[i * FH:(i + 1) * FH, :, :3] = np.clip(rgb, 0, 255)
+    lstrip[i * FH:(i + 1) * FH, :, 3] = a_ * 255
+    LBL_C.append(((X0 + FW / 2) / 2.0, (Y0 + FH / 2) / 2.0))
+Image.fromarray(lstrip.astype(np.uint8), 'RGBA').save(os.path.join(ROOT, 'mode_labels.png'), optimize=True)
+
 # calque d'eclairage de la LED (la facade recoit la lumiere)
 RAD = min(220, int(ly) - 2)
 x0, y0 = int(round(lx - RAD)), int(round(ly - RAD))
@@ -495,16 +528,19 @@ sub = canvas[y0:y0 + 2 * RAD, x0:x0 + 2 * RAD].copy()
 gy2, gx2 = np.mgrid[0:2 * RAD, 0:2 * RAD].astype(np.float32)
 dd = np.hypot(gx2 + x0 - lx, gy2 + y0 - ly)
 def lamb(h): return (h * h / (h * h + dd * dd)) ** 1.5
-I = 1.30 * lamb(16) + 0.30 * lamb(70) + 0.09 * lamb(170)
-halo = 0.10 * lamb(26)
+I = 1.10 * lamb(18) + 0.24 * lamb(70) + 0.05 * lamb(160)        # halo de la LED adouci
+halo = 0.06 * lamb(24)
 litL = sub * (1 + I[..., None] * LED_COL * 2.4) + halo[..., None] * LED_COL * 255
 core = np.clip(1 - dd / LENS, 0, 1)
-lensOn = (LED_COL * 255)[None, None, :] * (0.55 + 0.45 * core[..., None]) + (np.clip(core * 1.8 - 0.9, 0, 1) ** 1.5 * 255)[..., None] * (1 - LED_COL * 0.3)
-lensOn += (dome[y0:y0 + 2 * RAD, x0:x0 + 2 * RAD] * 0.6)[..., None]
+# LED allumee : lentille bleu vif et saturee, eclaircie vers le centre, petit point chaud presque blanc
+body = np.array([50, 160, 255], np.float32) * (1 - core[..., None] * 0.5) + np.array([150, 215, 255], np.float32) * (core[..., None] * 0.5)
+hot = (np.clip(core * 2.2 - 1.2, 0, 1) ** 1.5)[..., None]
+lensOn = body * (1 - hot) + np.array([225, 245, 255], np.float32) * hot
+lensOn += (dome[y0:y0 + 2 * RAD, x0:x0 + 2 * RAD] * 0.25)[..., None]
 lmk = np.clip(LENS - dd + 0.5, 0, 1)[..., None]
 litL = litL * (1 - lmk) + lensOn * lmk
 edge = np.clip((RAD - dd) / (RAD * 0.35), 0, 1) ** 2
-a = np.clip((I + halo * 3.0) * 2.2, 0, 1) * edge
+a = np.clip((I + halo * 3.0) * 1.7, 0, 1) * edge
 a = np.maximum(a, lmk[..., 0])
 rgba = np.dstack([np.clip(litL, 0, 255), a * 255]).astype(np.uint8)
 Image.fromarray(rgba, 'RGBA').save(os.path.join(ROOT, 'glow_led.png'), optimize=True)
@@ -550,5 +586,8 @@ with open(os.path.join(ROOT, 'Layout.h'), 'w') as fo:
     fo.write('    const juce::Rectangle<float> glowRect { %.2ff, %.2ff, %.2ff, %.2ff };\n' % tuple(info['glowRect']))
     fo.write('    const juce::Rectangle<float> rowRect %s;\n' % Rr(info['row']))
     fo.write('    const juce::Rectangle<float> barRect %s;\n' % Rr(info['bar']))
+    fo.write('    // etiquettes du selecteur allumees (mode_labels.png : 8 images %d x %d px du fond 2x empilees)\n' % (FW, FH))
+    fo.write('    const float labelW = %.2ff, labelH = %.2ff;\n' % (FW / 2.0, FH / 2.0))
+    fo.write('    const juce::Point<float> labelPos[8] = { %s };\n' % ', '.join(P(c) for c in LBL_C))
     fo.write('}\n')
 print('ok', WC, HC, CX0, CY0)

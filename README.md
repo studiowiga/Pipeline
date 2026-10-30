@@ -26,11 +26,11 @@ JUCE 8.0.15 ; rendu logiciel forcé sous Windows (réappliqué à chaque nouvell
 ## Fichiers
 
 - `PipelineDSP.h` : moteur audio (ligne de retard modulée, interpolation Hermite, suiveur d'enveloppe, fondu de têtes de lecture).
-- `PluginProcessor.*`, `PluginEditor.*`, `Layout.h` (généré), `background.jpg`, `glow_led.png`, `knob_strip.png` (potards de Holyverb).
+- `PluginProcessor.*`, `PluginEditor.*`, `Layout.h` (généré), `background.jpg`, `glow_led.png`, `knob_strip.png` (potards de Holyverb), `mode_labels.png` (étiquettes allumées).
 - `tools/make_background.py` : fond tiré du visuel (repères effacés, éléments déplacés), calque de la LED, `Layout.h`.
 - `tools/render/` : compile la vraie fenêtre sous Linux et exporte les captures ; `tools/manual.py` : notice PDF.
 - `tests/test_dsp.cpp` : banc d'essai du moteur (hauteur mesurée par mode, crêtes, bypass exact).
-- `docs/Pipeline_Manual_EN-FR_v1.3.2.pdf` : notice bilingue.
+- `docs/Pipeline_Manual_EN-FR_v1.4.0.pdf` : notice bilingue.
 
 ## Compilation
 
@@ -41,6 +41,8 @@ Le workflow GitHub `build.yml` produit les artefacts `Pipeline-VST3-Windows` et 
 
 ## Historique
 
+- **1.4.0** : sélecteur MODE agrandi avec crans plus marqués, étiquette du mode choisi allumée en bleu (écriture LED), LED du haut agrandie (halo adouci), écran : texte à gauche et oscilloscope animé de la modulation à droite.
+- **1.4.0** : crans du sélecteur plus marqués, potard MODE agrandi, étiquette du mode choisi allumée en bleu (écriture LED), LED agrandie au halo adouci, écran : texte à gauche et oscilloscope de la modulation en direct.
 - **1.3.2** : footswitch d'Echoflex (vue de dessus), bulles et filet du cadre préservés, ombre carrée des potards supprimée, vagues intactes sous l'écran, fond assombri, menu clic droit sous le pointeur, footswitch MIDI : chaque appui bascule marche / arrêt (par défaut).
 - **1.3.1** : ombres et cercles des anciens potards supprimés, graduations redessinées (dont ENV R / ENV P), jacks et IN / OUT au niveau du titre, footswitch remonté sans déformer les vagues, écran nettoyé.
 - **1.3.0** : potards moletés et embases jack de Holyverb, potards encore abaissés, pédale élargie.

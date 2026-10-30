@@ -8,8 +8,13 @@ namespace
 {
     // positions dans le repere 760 x 958 (fond 1520 x 1916), generees par tools/make_background.py dans Layout.h
     const float knobHalf = layout::knobSkirt + 6.0f;
-    const float modeHalf = layout::modeSkirt + 6.0f;
+    const float modeHalf = layout::modeSkirt * 1.24f + 4.0f;
     const Rectangle<float> statusRect = layout::rowRect;
+    // ligne du haut de l'ecran : texte a gauche, oscilloscope de la modulation a droite
+    // courbe plus courte : meme extremite droite (90 % de la ligne), debut ramene vers la droite
+    const Rectangle<float> textRect  = statusRect.withWidth (statusRect.getWidth() * 0.58f).withTrimmedLeft (14.0f);
+    const Rectangle<float> scopeRect = statusRect.withX (statusRect.getX() + statusRect.getWidth() * 0.60f)
+                                                 .withWidth (statusRect.getWidth() * 0.30f).reduced (8.0f, 9.0f);
     const Rectangle<float> presetRect = layout::barRect;
     const Rectangle<float> footRect (layout::footPos.x - 60.0f, layout::footPos.y - 62.0f, 120.0f, 124.0f);
 
@@ -29,7 +34,7 @@ namespace
     constexpr int   stripFrames = 8, knurlTeeth = 76;
     float spriteHalf (float knobR) { return knobR / stripKnobR; }
     const float rateR = layout::knobSkirt * 1.02f;   // potards RATE / DEPTH (taille des potards du visuel)
-    const float modeR = layout::modeSkirt * 1.04f;   // selecteur MODE
+    const float modeR = layout::modeSkirt * 1.24f;   // selecteur MODE (agrandi)
 
 }
 
@@ -206,6 +211,11 @@ PipelineAudioProcessorEditor::PipelineAudioProcessorEditor (PipelineAudioProcess
     background = ImageCache::getFromMemory (BinaryData::background_jpg, BinaryData::background_jpgSize);
     glowLed    = ImageCache::getFromMemory (BinaryData::glow_led_png, BinaryData::glow_led_pngSize);
     knobStrip  = ImageCache::getFromMemory (BinaryData::knob_strip_png, BinaryData::knob_strip_pngSize);
+    labelStrip = ImageCache::getFromMemory (BinaryData::mode_labels_png, BinaryData::mode_labels_pngSize);
+    {
+        const int p0 = jlimit (0, 7, roundToInt (proc.raw ("mode")));
+        labelLit[p0] = 1.0f;
+    }
     labelFace = Typeface::createSystemTypefaceFor (BinaryData::BarlowCondensedSemiBold_ttf, BinaryData::BarlowCondensedSemiBold_ttfSize);
     boldFace  = Typeface::createSystemTypefaceFor (BinaryData::BarlowCondensedBold_ttf, BinaryData::BarlowCondensedBold_ttfSize);
 
@@ -283,6 +293,10 @@ void PipelineAudioProcessorEditor::rebuildCaches (float sc)
     };
     knobBig = stripAt (rateR);
     knobSmall = stripAt (modeR);
+    {
+        const int lw = roundToInt (layout::labelW * s * sc), lh = roundToInt (layout::labelH * s * sc);
+        labelStripS = (lw <= 0 || lw >= labelStrip.getWidth()) ? Image() : labelStrip.rescaled (lw, lh * 8, Graphics::highResamplingQuality);
+    }
     repaint();
 }
 
@@ -372,7 +386,7 @@ String PipelineAudioProcessorEditor::buildInfoLine() const
     const String cents = String (CharPointer_UTF8 ("\xc2\xb1")) + String (roundToInt (peakCents)) + " c";
     if (mode == pipeline::EnvP) return name + "   BEND " + String (-roundToInt (peakCents)) + " c";
     if (mode == pipeline::EnvR) return name + "   " + cents;
-    return name + "   " + rateText (proc.raw ("rate")) + "   " + cents;
+    return name + "  " + rateText (proc.raw ("rate")) + "  " + cents;
 }
 
 String PipelineAudioProcessorEditor::buildPresetLine() const
@@ -418,6 +432,18 @@ void PipelineAudioProcessorEditor::timerCallback()
             askRepaint (scaled (square (kc[k], spriteHalf (rateR) + 2.0f)));
         }
     if (modeKnob.tick()) askRepaint (scaled (square (layout::modePos, spriteHalf (modeR) + 2.0f)));
+    // etiquette du mode choisi : s'allume en bleu (fondu 0,35 a l'allumage, 0,22 a l'extinction, par image a 30 Hz)
+    for (int i = 0; i < 8; ++i)
+    {
+        const float t = (i == modeKnob.getPosition()) ? 1.0f : 0.0f;
+        labelLit[i] += (t - labelLit[i]) * (t > labelLit[i] ? 0.35f : 0.22f);
+        if (std::abs (labelLit[i] - t) < 0.004f) labelLit[i] = t;
+        if (std::abs (labelLit[i] - drawnLabel[i]) > 0.003f)
+        {
+            drawnLabel[i] = labelLit[i];
+            askRepaint (scaled (Rectangle<float> (layout::labelW, layout::labelH).withCentre (layout::labelPos[i])));
+        }
+    }
 
     // ligne d'etat : apparait quand un reglage bouge, reste 2,5 s puis s'efface
     int changed = -1, numChanged = 0;
@@ -472,6 +498,20 @@ void PipelineAudioProcessorEditor::timerCallback()
         askRepaint (scaled (layout::glowRect));
     }
 
+    // oscilloscope : historique de l'enveloppe et de la hauteur (modes Env), phase du LFO, redessin a 30 Hz si actif
+    {
+        envHist[histPos] = jlimit (0.0f, 1.0f, proc.shownEnv.load());
+        centsHist[histPos] = proc.shownCents.load();
+        histPos = (histPos + 1) % histN;
+        const double dt = lastScopeMs > 0.0 ? jlimit (0.0, 0.2, (now - lastScopeMs) * 0.001) : 0.0;
+        lastScopeMs = now;
+        const float hz = proc.raw ("sync") > 0.5f && proc.shownHz.load() > 0.0f ? proc.shownHz.load() : pipeline::rateToHz (proc.raw ("rate") / 10.0f);
+        scopePhase = std::fmod (scopePhase + (double) hz * dt, 4096.0);
+        if (proc.raw ("active") > 0.5f || scopeWasLive)
+            askRepaint (scaled (scopeRect.expanded (4.0f)));
+        scopeWasLive = proc.raw ("active") > 0.5f;
+    }
+
     // l'info change souvent : rafraichie au plus toutes les 150 ms (lisible, pas de scintillement)
     const auto l1 = (learnLineUntil > 0.0 && now < learnLineUntil + 800.0 ? learnLine : buildStatusLine());
     String info = lastInfo;
@@ -505,6 +545,22 @@ void PipelineAudioProcessorEditor::drawLed (Graphics& g)
 
 // potards de Holyverb : le moletage tourne (8 phases : il a 76 dents, la periode est de 4,7 degres),
 // l'index blanc et le point sont dessines a l'angle exact ; reflets et ombre fixes (lumiere en haut a gauche)
+void PipelineAudioProcessorEditor::drawModeLabels (Graphics& g)
+{
+    const Image& img = labelStripS.isValid() ? labelStripS : labelStrip;
+    if (! img.isValid()) return;
+    const int fw = img.getWidth(), fh = img.getHeight() / 8;
+    g.setImageResamplingQuality (labelStripS.isValid() ? Graphics::mediumResamplingQuality : Graphics::highResamplingQuality);
+    for (int i = 0; i < 8; ++i)
+        if (labelLit[i] > 0.003f)
+        {
+            g.setOpacity (labelLit[i]);
+            g.drawImage (img.getClippedImage ({ 0, i * fh, fw, fh }),
+                         Rectangle<float> (layout::labelW, layout::labelH).withCentre (layout::labelPos[i]));
+        }
+    g.setOpacity (1.0f);
+}
+
 void PipelineAudioProcessorEditor::drawKnobs (Graphics& g)
 {
     struct K { Point<float> c; float r, angle; const Image* img; bool dot; };
@@ -563,21 +619,133 @@ void PipelineAudioProcessorEditor::drawFootswitch (Graphics& g)
     g.fillEllipse (c.x - r, c.y - r, r * 2.0f, r * 2.0f);
 }
 
+// forme de la modulation de hauteur (memes formes que le moteur : vers le haut = hauteur qui monte)
+static float scopeShape (int mode, double p)
+{
+    const double f = p - std::floor (p);
+    switch (mode)
+    {
+        case pipeline::Triangle: return (float) (1.0 - 4.0 * std::abs (f - 0.5));
+        case pipeline::Ramp:
+        {
+            const double a = 0.025, sus = -0.38;
+            if (f < a) return (float) std::sin (0.5 * MathConstants<double>::pi * f / a);
+            if (f < 0.80) return (float) (sus + (1.0 - sus) * std::exp (-(f - a) / 0.075));
+            const double r = (f - 0.80) / 0.20, end = sus + (1.0 - sus) * std::exp (-(0.80 - a) / 0.075);
+            return (float) (end * (1.0 - r * r * (3.0 - 2.0 * r)));
+        }
+        case pipeline::Square: return (float) (std::tanh (14.0 * std::sin (MathConstants<double>::twoPi * f)) / std::tanh (14.0));
+        default: return (float) std::cos (MathConstants<double>::twoPi * f);
+    }
+}
+
+// bruit lisse deterministe (mode Random) : valeurs aleatoires a chaque demi-cycle, raccord en S
+static float scopeNoise (double p)
+{
+    auto h = [] (int64 i) { uint32 x = (uint32) (i * 2654435761u) ^ 0x9E3779B9u; x ^= x >> 15; x *= 0x2C1B3C6Du; x ^= x >> 12; return (float) (x & 0xFFFF) / 32767.5f - 1.0f; };
+    const double q = p * 2.0;
+    const int64 i = (int64) std::floor (q);
+    const float t = (float) (q - (double) i), s = t * t * (3.0f - 2.0f * t);
+    return h (i) + (h (i + 1) - h (i)) * s;
+}
+
+void PipelineAudioProcessorEditor::drawScope (Graphics& g, Rectangle<float> r)
+{
+    const bool on = proc.raw ("active") > 0.5f;
+    const int mode = jlimit (0, 7, roundToInt (proc.raw ("mode")));
+    const float depth = proc.raw ("depth") / 10.0f, rate = proc.raw ("rate") / 10.0f;
+    const float mid = r.getCentreY(), half = r.getHeight() * 0.5f;
+
+    // graticule discrete (axe central + reperes), comme un petit ecran d'oscilloscope
+    g.setColour (lcd.withAlpha (0.10f));
+    g.drawHorizontalLine (roundToInt (mid), r.getX(), r.getRight());
+    for (int k = 1; k < 4; ++k)
+    {
+        const float x = r.getX() + r.getWidth() * (float) k / 4.0f;
+        for (float y = r.getY(); y < r.getBottom(); y += 4.0f) g.fillRect (x, y, 0.8f, 1.6f);
+    }
+
+    const int N = 140;
+    float hz = proc.raw ("sync") > 0.5f && proc.shownHz.load() > 0.0f ? proc.shownHz.load() : pipeline::rateToHz (rate);
+    float window = jlimit (0.25f, 2.0f, 6.0f / jmax (0.05f, hz));     // au plus ~6 cycles visibles, au moins 0,25 s
+    float amp = on ? (0.10f + 0.85f * std::pow (depth, 0.8f)) : 0.0f;
+
+    auto histAt = [this] (const float* h, float u)                      // u = 0 (ancien) .. 1 (recent)
+    {
+        const float pos = u * (float) (histN - 1);
+        const int i0 = (int) pos; const float t = pos - (float) i0;
+        const float a0 = h[(histPos + i0) % histN], a1 = h[(histPos + jmin (histN - 1, i0 + 1)) % histN];
+        return a0 + (a1 - a0) * t;
+    };
+
+    Path p;
+    double envPhase = 0.0;
+    for (int i = 0; i < N; ++i)
+    {
+        const float u = (float) i / (float) (N - 1);                      // gauche = passe, droite = maintenant
+        float v = 0.0f;
+        if (on)
+        {
+            const double ph = scopePhase - (double) ((1.0f - u) * window * hz);
+            switch (mode)
+            {
+                case pipeline::Random:
+                {
+                    const float chaos = jlimit (0.0f, 1.0f, (depth - 0.12f) / 0.70f);
+                    v = (1.0f - chaos) * std::cos ((float) (MathConstants<double>::twoPi * ph)) + chaos * scopeNoise (ph * (1.0 + 0.6 * chaos));
+                    break;
+                }
+                case pipeline::EnvD:
+                    // l'attaque ouvre la profondeur (DEPTH = sensibilite) : le sinus gonfle a chaque note
+                    v = scopeShape (pipeline::Sine, ph) * jlimit (0.0f, 1.0f, histAt (envHist, u) * 1.4f) / jmax (0.1f, amp) * 0.9f;
+                    break;
+                case pipeline::EnvR:
+                {
+                    // l'attaque accelere le LFO : la frequence affichee suit l'enveloppe
+                    const float e = histAt (envHist, u);
+                    const float fh = 0.35f * std::pow (13.0f / 0.35f, e);
+                    envPhase += (double) (fh * window / (float) (N - 1));
+                    v = std::cos ((float) (MathConstants<double>::twoPi * envPhase));
+                    break;
+                }
+                case pipeline::EnvP:
+                    // plongee de hauteur a chaque attaque (historique reel), vers le bas
+                    v = jlimit (-1.0f, 1.0f, histAt (centsHist, u) / 250.0f) / jmax (0.1f, amp) * 0.9f;
+                    break;
+                default:
+                    v = scopeShape (mode, ph);
+                    break;
+            }
+        }
+        const float x = r.getX() + u * r.getWidth();
+        const float y = mid - jlimit (-1.0f, 1.0f, v * amp) * half;
+        if (i == 0) p.startNewSubPath (x, y); else p.lineTo (x, y);
+    }
+    // trace lumineux : halo large et doux, puis trait fin plus clair (comme l'ecriture de l'ecran)
+    g.setColour (lcd.withAlpha (on ? 0.10f : 0.05f));
+    g.strokePath (p, PathStrokeType (5.0f, PathStrokeType::curved, PathStrokeType::rounded));
+    g.setColour (lcd.withAlpha (on ? 0.22f : 0.08f));
+    g.strokePath (p, PathStrokeType (2.8f, PathStrokeType::curved, PathStrokeType::rounded));
+    g.setColour ((on ? lcd.brighter (0.25f) : lcd).withAlpha (on ? 0.95f : 0.30f));
+    g.strokePath (p, PathStrokeType (1.4f, PathStrokeType::curved, PathStrokeType::rounded));
+}
+
 void PipelineAudioProcessorEditor::drawDisplay (Graphics& g)
 {
     // ligne du haut : reglage qui vient de bouger (fondu), sinon ce que fait le vibrato ; couleur bleu glace
     const float a = statusAlpha;
-    const auto sr = statusRect.toNearestInt();
+    const auto sr = textRect.toNearestInt();
     auto glowText = [&] (const String& t, Font f, float alpha)
     {
         g.setFont (f);
         g.setColour (lcd.withAlpha (0.15f * alpha));
         for (auto d : { Point<int> (-1, 0), Point<int> (1, 0), Point<int> (0, -1), Point<int> (0, 1) })
-            g.drawFittedText (t, sr.translated (d.x, d.y), Justification::centred, 1, 0.8f);
+            g.drawFittedText (t, sr.translated (d.x, d.y), Justification::centredLeft, 1, 0.62f);
         g.setColour (lcd.withAlpha (alpha));
-        g.drawFittedText (t, sr, Justification::centred, 1, 0.8f);
+        g.drawFittedText (t, sr, Justification::centredLeft, 1, 0.62f);
     };
-    const Font big (FontOptions (boldFace).withHeight (26.5f));
+    const Font big (FontOptions (boldFace).withHeight (25.0f));
+    drawScope (g, scopeRect);
     if (a < 0.999f) glowText (lastInfo, big.withExtraKerningFactor (0.05f), 0.92f * (1.0f - a));
     if (a > 0.0f)   glowText (lastLine1, big.withExtraKerningFactor (0.05f), a);
 
@@ -618,6 +786,7 @@ void PipelineAudioProcessorEditor::paint (Graphics& g)
     const float s = (float) getHeight() / (float) baseH;
     g.addTransform (AffineTransform::scale (s));
     drawLed (g);
+    drawModeLabels (g);
     drawKnobs (g);
     drawFootswitch (g);
     drawDisplay (g);

@@ -139,6 +139,10 @@ private:
     juce::Image background, bgScaled, glowLed, glowLedS;
     // potards moletes de Holyverb : filmstrip 8 phases du moletage (lumiere fixe en haut a gauche), copies a l'echelle
     juce::Image knobStrip, knobBig, knobSmall;
+    // etiquettes du selecteur allumees en bleu (ecriture LED) : 8 images empilees, fondu a l'allumage / extinction
+    juce::Image labelStrip, labelStripS;
+    float labelLit[8] {}, drawnLabel[8] { -1, -1, -1, -1, -1, -1, -1, -1 };
+    void drawModeLabels (juce::Graphics&);
     int cacheW = 0, cacheH = 0;
     float cacheScale = 0.0f;
     int resizeSettle = 0;
@@ -161,6 +165,13 @@ private:
     int lastPresetCounter = 0, lastMidiCount = 0, midiFlash = 0;
     int hoverZone = 0, drawnHover = -1;
     float peakCents = 0.0f;              // ecart de hauteur crete (affichage, retombe doucement)
+    // oscilloscope de l'ecran : forme de la modulation de hauteur (mode, vitesse, profondeur), defile en temps reel
+    static constexpr int histN = 64;     // 64 images a 30 Hz = ~2,1 s
+    float envHist[histN] {}, centsHist[histN] {};
+    int histPos = 0;
+    double scopePhase = 0.0, lastScopeMs = 0.0;
+    bool scopeWasLive = true;
+    void drawScope (juce::Graphics&, juce::Rectangle<float>);
     double infoNextMs = 0.0;
 
     juce::String learnLine;
