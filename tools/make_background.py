@@ -1,19 +1,22 @@
 """
-PIPELINE (Studio Wiga) - fond du plugin a partir du visuel de l'utilisateur (design/source/pipeline_visuel.jpg, 812 x 1024).
+PIPELINE (Studio Wiga) - fond du plugin a partir du visuel « vagues » de l'utilisateur
+(design/source/pipeline_visuel_vagues.png, 1117 x 1408).
 
-Le visuel est la reference : son eclairage (lumiere douce en haut a gauche) est conserve.
-Modifications demandees (v1.1.0) :
-  - pedale un peu moins haute : une bande de 30 px est retiree entre l'ecran et le footswitch,
-  - potards RATE / DEPTH abaisses (+18 px), bloc MODE abaisse (+12 px) et inscription MODE placee AU-DESSUS du selecteur,
+Le visuel est la reference : son eclairage (lumiere douce en haut a gauche) et ses vagues sont conserves.
+Modifications demandees :
+  - pedale un peu moins haute : la zone entre l'ecran et le footswitch (ou etait la LED) est resserree,
+  - potards RATE / DEPTH abaisses (+14 px), inscription MODE placee AU-DESSUS du selecteur,
   - LED deplacee en haut (au centre, entre les deux potards),
-  - footswitch et logo Studio Wiga remontes (le logo ne touche plus le filet du cadre).
+  - footswitch et logo Studio Wiga remontes (le logo ne touche plus le footswitch ni le filet du cadre),
+  - pedale agrandie dans la fenetre (marges du mur reduites au minimum, taille de fenetre inchangee).
+Les vagues passant sous les elements du bas, le footswitch reste celui du visuel (deplace d'un bloc, sans retouche).
 Etapes :
-  1. reperes des potards effaces (ils sont redessines et tournent dans le plugin), textes de l'ecran effaces (le plugin y ecrit),
-  2. plaque nue : chaque element est retire (interpolation par ligne de la facade + grain de la photo),
-  3. bande retiree, elements recolles a leur nouvelle place par transfert de difference (ombres et reflets compris),
-  4. recadrage aux proportions 760 x 958 puis mise a l'echelle 1520 x 1916,
-  5. footswitch d'ECHOFLEX (photo detouree, ombres comprises), LED (bague chromee, lentille eteinte) + calque d'eclairage,
-  6. Layout.h, tools/layout.json, tools/pedal_mask.png.
+  1. reperes des potards et textes de l'ecran effaces (le plugin les redessine),
+  2. potards, MODE et LED retires de la facade unie (interpolation par ligne + grain), logo efface sur les vagues,
+  3. potards et MODE recolles a leur nouvelle place par transfert de difference (ombres comprises),
+  4. bas de la pedale remappe ligne par ligne : bande de la LED resserree, bloc du footswitch deplace sans deformation,
+  5. logo recolle (matte blanc), recadrage serre aux proportions 760 x 958, mise a l'echelle 1520 x 1916,
+  6. LED (bague chromee, lentille eteinte) + calque d'eclairage, Layout.h, tools/layout.json, tools/pedal_mask.png.
 
 Usage : python3 tools/make_background.py
 """
@@ -23,36 +26,35 @@ from PIL import Image
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
-SRC = os.path.join(ROOT, 'design', 'source', 'pipeline_visuel.jpg')
+SRC = os.path.join(ROOT, 'design', 'source', 'pipeline_visuel_vagues.png')
 rng = np.random.default_rng(7)
 
-A = cv2.cvtColor(cv2.imread(SRC), cv2.COLOR_BGR2RGB).astype(np.float32)
+A = np.asarray(Image.open(SRC).convert('RGB')).astype(np.float32)
 H, W = A.shape[:2]
 lum = lambda a: a.mean(-1)
 
 # ------------------------------------------------------------------ reperes mesures sur le visuel (px)
-RATE_C, DEPTH_C, MODE_C = (277.5, 211.0), (533.4, 211.0), (405.8, 422.9)
-CAP_R, SKIRT_R = 36.0, 53.0
-MODE_CAP_R, MODE_SKIRT_R = 26.5, 38.0
-FOOT_C = (406.0, 895.0)
-DISPLAY = (207, 656, 605, 772)
-ROW = (222.0, 674.0, 590.0, 712.0)        # ligne d'etat (texte bleu)
-BAR = (225.0, 727.3, 588.3, 760.0)        # barre de presets (cadre garde)
-BORDER_Y = 965                            # filet bas du cadre
+RATE_C, DEPTH_C, MODE_C = (383.0, 292.0), (735.0, 292.0), (559.0, 583.0)
+CAP_R, SKIRT_R = 54.0, 72.0
+MODE_CAP_R, MODE_SKIRT_R = 35.0, 50.0
+FOOT_CAP = (558.5, 1237.0)               # centre du bouton du footswitch (dessus)
+FOOT_NUT_R = 74.0
+DISPLAY = (287, 903, 833, 1060)
+ROW = (300.0, 922.0, 820.0, 990.0)       # ligne d'etat (texte bleu)
+BAR = (308.0, 998.0, 808.0, 1046.0)      # barre de presets (cadre garde)
+LOGO_BOX = (455, 1302, 664, 1325)
 
-# deplacements (px du visuel)
-D_KNOBS, D_MODE = 18, 12
-CUT0, CUT1 = 790, 820                     # bande retiree (entre l'ecran et le footswitch)
-CUT = CUT1 - CUT0
-MODE_WORD_NEW_Y = 340.0                   # centre de l'inscription MODE (coordonnees finales)
-LOGO_DY = -38                             # logo : remonte de 8 px de plus que la coupe
-FOOT_NEW = (406.0, 851.0)                 # footswitch (coordonnees finales)
-LED_NEW = (406.0, 118.0)                  # LED en haut, entre les potards
-FS_HEX_W = 92.0                           # largeur de l'ecrou du footswitch (px du visuel)
+D_KNOBS = 14
+MODE_WORD_NEW_Y = 449.0
+LED_NEW = (558.0, 124.0)
+# remappage du bas (destination <- source) : identite jusqu'a l'ecran, bande de la LED resserree,
+# bloc du footswitch rigide, bande sous le footswitch un peu etiree (place du logo), puis tout remonte de 20 px
+KNOTS = [(0, 0), (1062, 1062), (1118, 1144), (1280, 1306), (1306, 1326)]
+SHIFT = 20
+LOGO_DST_BOTTOM = 1300                   # bas du logo (bas des anneaux) dans l'image remappee
 
 # ------------------------------------------------------------------ 1. reperes des potards et textes de l'ecran
 def erase_pointer(c, r):
-    """ efface le repere clair du chapeau : inpainting limite au chapeau (l'exterieur est noirci pour ne pas couler) """
     global A
     cx, cy = c
     YY, XX = np.mgrid[0:H, 0:W].astype(np.float32)
@@ -61,26 +63,26 @@ def erase_pointer(c, r):
     m = cv2.dilate(m, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))) * inside
     tmp = A.copy()
     tmp[~inside] = np.median(A[inside & (lum(A) < 70)], 0)
-    out = cv2.inpaint(np.clip(tmp, 0, 255).astype(np.uint8), m.astype(np.uint8), 4, cv2.INPAINT_TELEA).astype(np.float32)
-    out = cv2.GaussianBlur(out, (0, 0), 0.6)
+    out = cv2.inpaint(np.clip(tmp, 0, 255).astype(np.uint8), m.astype(np.uint8), 5, cv2.INPAINT_TELEA).astype(np.float32)
+    out = cv2.GaussianBlur(out, (0, 0), 0.7)
     A = np.where(m[..., None] > 0, out + rng.normal(0, 1.2, out.shape).astype(np.float32), A)
 
 erase_pointer(RATE_C, CAP_R)
 erase_pointer(DEPTH_C, CAP_R)
 erase_pointer(MODE_C, MODE_CAP_R)
 
-def erase_display_text(box, thr=55):
-    """ texte de l'ecran : remplace par la trame de l'ecran prise sur la meme ligne (decalage pair = trame de 2 px) """
+def erase_display_text(box, thr=36):
+    """ texte de l'ecran : remplace par la trame de l'ecran prise sur la meme ligne (decalages pairs) """
     global A
     x0, y0, x1, y1 = box
     reg = A[y0:y1, x0:x1]
-    m = cv2.dilate((lum(reg) > thr).astype(np.uint8), np.ones((5, 5), np.uint8)).astype(bool)
+    m = cv2.dilate((lum(reg) > thr).astype(np.uint8), np.ones((7, 7), np.uint8)).astype(bool)
     out = reg.copy(); todo = m.copy()
-    for d in sorted(range(-220, 222, 2), key=abs):
+    for d in sorted(range(-300, 302, 2), key=abs):
         if d == 0 or not todo.any(): continue
         ys, xs = np.where(todo)
         sx = xs + x0 + d
-        ok = (sx >= DISPLAY[0] + 14) & (sx <= DISPLAY[2] - 14)
+        ok = (sx >= DISPLAY[0] + 26) & (sx <= DISPLAY[2] - 26)
         sxc = np.clip(sx - x0, 0, x1 - x0 - 1)
         inbox = (sx >= x0) & (sx < x1)
         src_bad = np.zeros_like(ok); src_bad[inbox] = m[ys[inbox], sxc[inbox]]
@@ -89,114 +91,122 @@ def erase_display_text(box, thr=55):
         todo[ys[good], xs[good]] = False
     A[y0:y1, x0:x1] = out
 
-erase_display_text((296, 676, 516, 711))      # ligne d'etat
-erase_display_text((318, 731, 510, 758))      # nom du preset
-erase_display_text((231, 735, 253, 752))      # fleches
-erase_display_text((560, 735, 582, 752))
+erase_display_text((418, 928, 698, 976))       # ligne d'etat
+erase_display_text((446, 1006, 670, 1041))     # nom du preset
+erase_display_text((318, 1010, 342, 1034))     # fleches
+erase_display_text((774, 1010, 798, 1034))
 
-# ------------------------------------------------------------------ 2. plaque nue
-def grain(shape, std=2.35):
+# ------------------------------------------------------------------ 2. facade nue sous les elements de la zone unie
+def grain(shape, std=2.3):
     g = rng.normal(0, 1, shape[:2]).astype(np.float32)
     g = cv2.GaussianBlur(g, (0, 0), 0.7); g *= std / (g.std() + 1e-6)
     return g[..., None] * np.ones(3, np.float32)
 
-def row_fill(img, box, edge=4):
-    """ facade sous l'element : interpolation lineaire par ligne entre les bords du cadre, lissee verticalement """
+def robust_edge(strip):
+    """ couleur de facade d'une bande de bord, ligne par ligne, sans les bulles ni les traits clairs """
+    L = lum(strip)
+    ref = np.median(L, axis=1, keepdims=True)
+    ok = L <= ref + 12
+    out = np.empty((strip.shape[0], 3), np.float32)
+    for r in range(strip.shape[0]):
+        v = strip[r][ok[r]] if ok[r].any() else strip[r]
+        out[r] = np.median(v, axis=0)
+    # une ligne entiere prise dans une bulle : on interpole depuis les lignes voisines
+    Lr = out.mean(-1); pad = np.pad(Lr, 15, mode='edge'); base = np.array([np.median(pad[i:i + 31]) for i in range(len(Lr))])
+    bad = Lr > base + 8
+    if bad.any() and (~bad).any():
+        for c in range(3): out[bad, c] = np.interp(np.where(bad)[0], np.where(~bad)[0], out[~bad, c])
+    return out
+
+def row_fill(img, box, edge=8):
     x0, y0, x1, y1 = box
-    left = np.median(img[y0:y1, x0:x0 + edge], axis=1)
-    right = np.median(img[y0:y1, x1 - edge:x1], axis=1)
+    left = robust_edge(img[y0:y1, x0:x0 + edge])
+    right = robust_edge(img[y0:y1, x1 - edge:x1])
     t = np.linspace(0, 1, x1 - x0, dtype=np.float32)[None, :, None]
     f = left[:, None, :] * (1 - t) + right[:, None, :] * t
     return cv2.GaussianBlur(f, (0, 0), sigmaX=0.1, sigmaY=2.0)
 
-BOXES = {
-    'rate':  (200, 108, 374, 316), 'depth': (450, 108, 630, 316),
-    'mode':  (296, 336, 516, 503), 'word':  (374, 503, 438, 528),
-    'led':   (360, 775, 452, 848), 'foot':  (338, 824, 476, 951), 'logo': (326, 940, 488, 964),
-}
-FILL = {}                     # facade lisse (sans grain) sous chaque element
-ALPHA = {}                    # masque doux de l'element (ombres comprises)
+BOXES = {'rate': (280, 158, 488, 404), 'depth': (630, 158, 840, 404), 'word': (516, 690, 602, 726), 'led': (486, 1068, 634, 1146)}
+FILL, ALPHA = {}, {}
 plate = A.copy()
-for k in ('rate', 'depth', 'mode', 'word', 'led', 'foot', 'logo'):
-    x0, y0, x1, y1 = BOXES[k]
+for k, (x0, y0, x1, y1) in BOXES.items():
     f = row_fill(plate, BOXES[k])
     dev = np.abs(A[y0:y1, x0:x1] - f).max(-1)
     a = np.clip((dev - 4.0) / 12.0, 0, 1)
     a = cv2.GaussianBlur(cv2.dilate(a, np.ones((5, 5), np.uint8)), (0, 0), 1.4)
-    if k == 'logo':           # logo : seulement les lettres (le filet du cadre, juste dessous, ne bouge pas)
-        lg = (lum(A[y0:y1, x0:x1]) > 100).astype(np.float32)
-        lg[BORDER_Y - 2 - y0:] = 0
-        a = cv2.GaussianBlur(cv2.dilate(lg, np.ones((3, 3), np.uint8)), (0, 0), 0.8)
-    # bord du cadre : fondu de 4 px (aucune arete de rectangle) ; logo : fondu lateral seulement
     fe = np.ones_like(a); e = 4
     for i in range(e):
         w = (i + 0.5) / e
-        fe[:, i] *= w; fe[:, -1 - i] *= w
-        if k != 'logo': fe[i, :] *= w; fe[-1 - i, :] *= w
-    FILL[k] = f; ALPHA[k] = a
-    region = f + grain(f.shape)
-    wbox = np.clip(fe * 1.0, 0, 1)[..., None]
-    blended = plate[y0:y1, x0:x1] * (1 - wbox) + region * wbox
-    plate[y0:y1, x0:x1] = blended
+        fe[i, :] *= w; fe[-1 - i, :] *= w; fe[:, i] *= w; fe[:, -1 - i] *= w
+    FILL[k] = f; ALPHA[k] = a * fe
+    plate[y0:y1, x0:x1] = plate[y0:y1, x0:x1] * (1 - fe[..., None]) + (f + grain(f.shape)) * fe[..., None]
+    if k == 'led':            # les bulles autour de la LED restent : seule la LED et sa lueur disparaissent
+        gy, gx = np.mgrid[y0:y1, x0:x1].astype(np.float32)
+        keep = np.clip((np.hypot(gx - 557.0, gy - 1112.0) - 46.0) / 6.0, 0, 1)
+        plate[y0:y1, x0:x1] += (A[y0:y1, x0:x1] - f) * (a * keep)[..., None]
 
-# filet du cadre sous le logo : le bas des lettres (et des anneaux) le touchait -> filet refait a partir d'une zone propre
-fx0, fx1 = 328, 486
-prof_l = np.median(A[BORDER_Y - 5:BORDER_Y + 4, 306:322], axis=1)
-prof_r = np.median(A[BORDER_Y - 5:BORDER_Y + 4, 492:508], axis=1)
-t = np.linspace(0, 1, fx1 - fx0, dtype=np.float32)[None, :, None]
-line = prof_l[:, None, :] * (1 - t) + prof_r[:, None, :] * t + grain((9, fx1 - fx0, 3), 1.5)
-plate[BORDER_Y - 5:BORDER_Y + 4, fx0:fx1] = line
+# logo sur les vagues : lettres et anneaux effaces (inpainting), matte blanc conserve pour le recoller
+lx0, ly0, lx1, ly1 = LOGO_BOX
+lreg = plate[ly0 - 6:ly1 + 1, lx0:lx1].copy()
+lm = (lum(lreg) > 110).astype(np.uint8)
+lm[-2:] = 0                                               # lignes du filet du cadre : pas touchees
+lm = cv2.dilate(lm, np.ones((5, 5), np.uint8))
+lm[-1:] = 0
+bgL = cv2.inpaint(np.clip(lreg, 0, 255).astype(np.uint8), lm, 3, cv2.INPAINT_TELEA).astype(np.float32)
+logo_alpha = np.clip((lum(lreg) - lum(bgL)) / np.maximum(235.0 - lum(bgL), 30.0), 0, 1) * (lm > 0)
+logo_alpha[-2:] = 0
+plate[ly0 - 6:ly1 + 1, lx0:lx1] = np.where(lm[..., None] > 0, bgL + grain(bgL.shape, 1.5), lreg)
 
-# ------------------------------------------------------------------ 3. coupe + elements a leur nouvelle place
-XF = 8
-top, bot = plate[:CUT0], plate[CUT1:]
-ramp = np.linspace(0, 1, XF, dtype=np.float32)[:, None, None]
-seam = plate[CUT0 - XF:CUT0] * (1 - ramp) + plate[CUT1 - XF:CUT1] * ramp
-P2 = np.concatenate([plate[:CUT0 - XF], seam, bot], axis=0)
-H2 = P2.shape[0]
-
-def paste_delta(k, dx, dy):
-    """ recolle un element : nouvelle facade + alpha x (photo - facade d'origine) -> ombres et reflets suivent """
-    global P2
+def paste_delta(img, k, dx, dy):
     x0, y0, x1, y1 = BOXES[k]
     delta = (A[y0:y1, x0:x1] - FILL[k]) * ALPHA[k][..., None]
-    nx0, ny0 = x0 + dx, y0 + dy
-    P2[ny0:ny0 + (y1 - y0), nx0:nx0 + (x1 - x0)] += delta
+    img[y0 + dy:y1 + dy, x0 + dx:x1 + dx] += delta
 
-paste_delta('rate', 0, D_KNOBS)
-paste_delta('depth', 0, D_KNOBS)
-paste_delta('mode', 0, D_MODE)
-paste_delta('word', 0, int(round(MODE_WORD_NEW_Y - (BOXES['word'][1] + BOXES['word'][3]) / 2)))
-paste_delta('logo', 0, LOGO_DY)
+paste_delta(plate, 'rate', 0, D_KNOBS)
+paste_delta(plate, 'depth', 0, D_KNOBS)
+wb = BOXES['word']
+paste_delta(plate, 'word', 0, int(round(MODE_WORD_NEW_Y - (wb[1] + wb[3]) / 2)))
 
-# ------------------------------------------------------------------ 4. recadrage 760 x 958 et mise a l'echelle 1520 x 1916
-WC = int(round(H2 * 760 / 958))
-CX0 = (W - WC) // 2
-P3 = P2[:, CX0:CX0 + WC]
+# ------------------------------------------------------------------ 4. remappage du bas, ligne par ligne
+Hd = H - SHIFT
+kn = KNOTS + [(Hd - 1, Hd - 1 + SHIFT)]
+dst = np.array([k[0] for k in kn], np.float32); src = np.array([k[1] for k in kn], np.float32)
+yd = np.arange(Hd, dtype=np.float32)
+ys = np.interp(yd, dst, src).astype(np.float32)
+# raccords adoucis (pas de cassure dans les lignes des vagues), le bloc du footswitch reste rigide
+ys_s = cv2.GaussianBlur(ys.reshape(-1, 1), (1, 0), sigmaX=0.1, sigmaY=3.0).ravel()
+rigid = (yd >= kn[2][0] + 6) & (yd <= kn[3][0] - 6)
+ys = np.where(rigid | (yd < 1056), ys, ys_s)
+mapx = np.tile(np.arange(W, dtype=np.float32), (Hd, 1))
+mapy = np.repeat(ys[:, None], W, axis=1).astype(np.float32)
+P2 = cv2.remap(plate, mapx, mapy, interpolation=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
+def to_dst(y):                                            # ligne source -> ligne destination (pour les reperes)
+    return float(np.interp(y, src, dst))
+
+# logo recolle (blanc du visuel) au-dessus du filet
+la = logo_alpha
+ny0 = LOGO_DST_BOTTOM - la.shape[0] + 1 + 2
+reg = P2[ny0:ny0 + la.shape[0], lx0:lx1]
+P2[ny0:ny0 + la.shape[0], lx0:lx1] = reg * (1 - la[..., None]) + np.array([236, 238, 236], np.float32) * la[..., None]
+
+# ------------------------------------------------------------------ 5. recadrage serre 760 x 958 et mise a l'echelle 1520 x 1916
+CY0 = 31
+CY1 = to_dst(1344) + 16
+HC = int(round(CY1 - CY0))
+WC = int(round(HC * 760 / 958))
+CX0 = int(round(558.0 - WC / 2))
+P3 = P2[CY0:CY0 + HC, CX0:CX0 + WC]
 W2F, H2F = 1520, 1916
-canvas = cv2.resize(np.clip(P3, 0, 255), (W2F, H2F), interpolation=cv2.INTER_LANCZOS4).astype(np.float32)
-SX, SY = W2F / WC, H2F / H2
-def T(p): return ((p[0] - CX0) * SX, p[1] * SY)          # px du visuel (apres coupe) -> px du fond 2x
-def U(p): x, y = T(p); return (x / 2.0, y / 2.0)          # -> unites 760 x 958
+canvas = cv2.resize(np.clip(P3, 0, 255), (W2F, H2F), interpolation=cv2.INTER_CUBIC).astype(np.float32)
+SX, SY = W2F / WC, H2F / HC
+def T(p): return ((p[0] - CX0) * SX, (p[1] - CY0) * SY)
+def U(p): x, y = T(p); return (x / 2.0, y / 2.0)
 
-# ------------------------------------------------------------------ 5a. footswitch d'ECHOFLEX
-fs = Image.open(os.path.join(HERE, 'fs_echoflex.png')).convert('RGBA')
-sc = FS_HEX_W * SX / 247.0                                # 247 px = largeur de l'ecrou dans le sprite
-fs = fs.resize((round(fs.width * sc), round(fs.height * sc)), Image.LANCZOS)
-fa = np.asarray(fs).astype(np.float32) / 255
-fcx, fcy = T(FOOT_NEW)
-# centre de l'ecrou dans le sprite : (199.5, 198) px -> recale le sprite sur le centre voulu
-ox, oy = int(round(fcx - 199.5 * sc)), int(round(fcy - 198.0 * sc))
-h_, w_ = fa.shape[:2]
-reg = canvas[oy:oy + h_, ox:ox + w_]
-canvas[oy:oy + h_, ox:ox + w_] = reg * (1 - fa[..., 3:]) + fa[..., :3] * 255 * fa[..., 3:]
-
-# ------------------------------------------------------------------ 5b. LED eteinte : bague chromee, gorge sombre, lentille bleue sombre
+# ------------------------------------------------------------------ 6a. LED eteinte : bague chromee, gorge sombre, lentille bleue sombre
 YY, XX = np.mgrid[0:H2F, 0:W2F].astype(np.float32)
 lx, ly = T(LED_NEW)
 d = np.hypot(XX - lx, YY - ly)
-RING, LENS = 19.0, 12.6                                   # px du fond 2x
-# ombre portee de la bague (lumiere en haut a gauche)
+RING, LENS = 13.6 * SX, 9.0 * SX
 sh = cv2.GaussianBlur((np.hypot(XX - lx - 3, YY - ly - 4) < RING).astype(np.float32), (0, 0), 3.5)
 canvas *= (1 - 0.45 * sh * (d >= RING - 1))[..., None]
 ang = np.arctan2(YY - ly, XX - lx)
@@ -208,7 +218,7 @@ canvas = canvas * (1 - ring[..., None]) + ringCol * ring[..., None]
 groove = np.exp(-((d - LENS) / 1.1) ** 2)
 canvas *= (1 - 0.6 * groove)[..., None]
 lens = np.clip(LENS - d + 0.5, 0, 1)
-LED_COL = np.array([0.22, 0.62, 1.00], np.float32)                           # bleu de la LED du visuel
+LED_COL = np.array([0.22, 0.62, 1.00], np.float32)
 lensOff = np.array([8, 20, 38], np.float32) * (0.55 + 0.45 * np.clip(1 - d / LENS, 0, 1))[..., None]
 dome = np.exp(-(((XX - lx + LENS * 0.33) / (LENS * 0.26)) ** 2 + ((YY - ly + LENS * 0.38) / (LENS * 0.20)) ** 2)) * 125
 lensOff = lensOff + dome[..., None]
@@ -217,8 +227,8 @@ canvas = canvas * (1 - lens[..., None]) + lensOff * lens[..., None]
 out = np.clip(canvas, 0, 255).astype(np.uint8)
 Image.fromarray(out).save(os.path.join(ROOT, 'background.jpg'), quality=93, subsampling=0)
 
-# ------------------------------------------------------------------ 5c. calque d'eclairage de la LED (la facade recoit la lumiere)
-RAD = 220
+# calque d'eclairage de la LED (la facade recoit la lumiere)
+RAD = min(220, int(ly) - 2)
 x0, y0 = int(round(lx - RAD)), int(round(ly - RAD))
 sub = canvas[y0:y0 + 2 * RAD, x0:x0 + 2 * RAD].copy()
 gy2, gx2 = np.mgrid[0:2 * RAD, 0:2 * RAD].astype(np.float32)
@@ -230,40 +240,40 @@ litL = sub * (1 + I[..., None] * LED_COL * 2.4) + halo[..., None] * LED_COL * 25
 core = np.clip(1 - dd / LENS, 0, 1)
 lensOn = (LED_COL * 255)[None, None, :] * (0.55 + 0.45 * core[..., None]) + (np.clip(core * 1.8 - 0.9, 0, 1) ** 1.5 * 255)[..., None] * (1 - LED_COL * 0.3)
 lensOn += (dome[y0:y0 + 2 * RAD, x0:x0 + 2 * RAD] * 0.6)[..., None]
-lm = np.clip(LENS - dd + 0.5, 0, 1)[..., None]
-litL = litL * (1 - lm) + lensOn * lm
+lmk = np.clip(LENS - dd + 0.5, 0, 1)[..., None]
+litL = litL * (1 - lmk) + lensOn * lmk
 edge = np.clip((RAD - dd) / (RAD * 0.35), 0, 1) ** 2
 a = np.clip((I + halo * 3.0) * 2.2, 0, 1) * edge
-a = np.maximum(a, lm[..., 0])
+a = np.maximum(a, lmk[..., 0])
 rgba = np.dstack([np.clip(litL, 0, 255), a * 255]).astype(np.uint8)
 Image.fromarray(rgba, 'RGBA').save(os.path.join(ROOT, 'glow_led.png'), optimize=True)
 
-# ------------------------------------------------------------------ 6a. silhouette (boitier + jacks) pour la notice
+# ------------------------------------------------------------------ 6b. silhouette (boitier + jacks) pour la notice
 f8 = out.astype(np.int16)
 blue = ((f8[..., 2] - f8[..., 0]) > 22).astype(np.uint8)
-blue = cv2.morphologyEx(blue, cv2.MORPH_CLOSE, np.ones((9, 9), np.uint8))
+blue = cv2.morphologyEx(blue, cv2.MORPH_CLOSE, np.ones((15, 15), np.uint8))
 cnts, _ = cv2.findContours(blue, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
 SIL = np.zeros((H2F, W2F), np.uint8)
 cv2.drawContours(SIL, [max(cnts, key=cv2.contourArea)], -1, 255, -1)
 wall = cv2.GaussianBlur(out.astype(np.float32).mean(-1), (0, 0), 25)
 jk = (np.abs(out.astype(np.float32).mean(-1) - wall) > 14).astype(np.uint8) * 255
-for (jx0, jx1) in ((int(T((118, 0))[0]), int(T((170, 0))[0])), (int(T((640, 0))[0]), int(T((700, 0))[0]))):
-    jy0, jy1 = int(T((0, 272))[1]), int(T((0, 362))[1])
+for (jx0, jx1) in ((int(T((165, 0))[0]), int(T((222, 0))[0])), (int(T((898, 0))[0]), int(T((950, 0))[0]))):
+    jy0, jy1 = int(T((0, 385))[1]), int(T((0, 465))[1])
     SIL[jy0:jy1, jx0:jx1] = np.maximum(SIL[jy0:jy1, jx0:jx1], jk[jy0:jy1, jx0:jx1])
 SIL = cv2.GaussianBlur(cv2.morphologyEx(SIL, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8)), (0, 0), 0.8)
 Image.fromarray(SIL).save(os.path.join(HERE, 'pedal_mask.png'))
 
-# ------------------------------------------------------------------ 6b. reperes pour le code (unites 760 x 958)
-k = 958.0 / H2
+# ------------------------------------------------------------------ 6c. reperes pour le code (unites 760 x 958)
+k = 958.0 / HC
 rate, depth = U((RATE_C[0], RATE_C[1] + D_KNOBS)), U((DEPTH_C[0], DEPTH_C[1] + D_KNOBS))
-mode = U((MODE_C[0], MODE_C[1] + D_MODE))
-led, foot = U(LED_NEW), U(FOOT_NEW)
+mode = U(MODE_C)
+led, foot = U(LED_NEW), U((FOOT_CAP[0], to_dst(FOOT_CAP[1])))
 def R(b): p0, p1 = U((b[0], b[1])), U((b[2], b[3])); return [round(p0[0], 2), round(p0[1], 2), round(p1[0] - p0[0], 2), round(p1[1] - p0[1], 2)]
 info = {
     'rate': rate, 'depth': depth, 'mode': mode, 'knobTop': CAP_R * k, 'knobSkirt': SKIRT_R * k,
-    'modeTop': MODE_CAP_R * k, 'modeSkirt': MODE_SKIRT_R * k, 'led': led, 'foot': foot, 'footR': FS_HEX_W * 0.5 * k * 0.92,
-    'ledLensR': LENS / 2, 'glowRect': [x0 / 2, y0 / 2, RAD, RAD], 'row': R(ROW), 'bar': R(BAR),
-    'display': R(DISPLAY), 'cropX0': CX0, 'cut': [CUT0, CUT1],
+    'modeTop': MODE_CAP_R * k, 'modeSkirt': MODE_SKIRT_R * k, 'led': led, 'foot': foot, 'footR': FOOT_NUT_R * k,
+    'ledLensR': LENS / 2, 'glowRect': [x0 / 2, y0 / 2, RAD, RAD], 'row': R(ROW), 'bar': R(BAR), 'display': R(DISPLAY),
+    'crop': [CX0, CY0, WC, HC],
 }
 json.dump(info, open(os.path.join(HERE, 'layout.json'), 'w'), indent=1)
 
@@ -282,4 +292,4 @@ with open(os.path.join(ROOT, 'Layout.h'), 'w') as fo:
     fo.write('    const juce::Rectangle<float> rowRect %s;\n' % Rr(info['row']))
     fo.write('    const juce::Rectangle<float> barRect %s;\n' % Rr(info['bar']))
     fo.write('}\n')
-print('ok', WC, H2, CX0)
+print('ok', WC, HC, CX0, CY0)

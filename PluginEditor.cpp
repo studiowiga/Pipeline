@@ -17,7 +17,7 @@ namespace
     float knobAngle (float v) { return degreesToRadians (rotStart + (rotEnd - rotStart) * jlimit (0.0f, 10.0f, v) / 10.0f); }
     float modeAngle (int p)   { return degreesToRadians (layout::modeFirstDeg + layout::modeStepDeg * (float) jlimit (0, 7, p)); }
 
-    const Colour inkWhite (0xffd8dad9), lcd (0xffa2d4ec);       // couleurs des textes de l'ecran du visuel
+    const Colour inkWhite (0xffd8dad9), lcd (0xff8ccdef);       // couleurs des textes de l'ecran du visuel
 
     const char* const valueIds[] = { "rate", "depth", "mode", "sync", "active", "flexi" };
     constexpr int numValueIds = 6;
@@ -509,9 +509,9 @@ void PipelineAudioProcessorEditor::drawLed (Graphics& g)
 void PipelineAudioProcessorEditor::drawKnobs (Graphics& g)
 {
     // reperes du visuel : du centre du chapeau vers son bord, gris clair a bouts arrondis
-    paintPointer (g, layout::ratePos,  layout::knobTop, knobAngle (rateKnob.getValue()),  0.06f, 0.90f, 4.0f);
-    paintPointer (g, layout::depthPos, layout::knobTop, knobAngle (depthKnob.getValue()), 0.06f, 0.90f, 4.0f);
-    paintPointer (g, layout::modePos,  layout::modeTop, modeKnob.getShownAngle(),         0.06f, 0.92f, 3.8f);
+    paintPointer (g, layout::ratePos,  layout::knobTop, knobAngle (rateKnob.getValue()),  0.06f, 0.90f, 5.0f);
+    paintPointer (g, layout::depthPos, layout::knobTop, knobAngle (depthKnob.getValue()), 0.06f, 0.90f, 5.0f);
+    paintPointer (g, layout::modePos,  layout::modeTop, modeKnob.getShownAngle(),         0.06f, 0.92f, 4.4f);
 }
 
 void PipelineAudioProcessorEditor::drawFootswitch (Graphics& g)
@@ -540,7 +540,7 @@ void PipelineAudioProcessorEditor::drawDisplay (Graphics& g)
         g.setColour (lcd.withAlpha (alpha));
         g.drawFittedText (t, sr, Justification::centred, 1, 0.8f);
     };
-    const Font big (FontOptions (boldFace).withHeight (27.0f));
+    const Font big (FontOptions (boldFace).withHeight (26.5f));
     if (a < 0.999f) glowText (lastInfo, big.withExtraKerningFactor (0.05f), 0.92f * (1.0f - a));
     if (a > 0.0f)   glowText (lastLine1, big.withExtraKerningFactor (0.05f), a);
 
@@ -564,7 +564,7 @@ void PipelineAudioProcessorEditor::drawDisplay (Graphics& g)
     };
     arrow (r.withWidth (aw), true, hoverZone == 1);
     arrow (r.withTrimmedLeft (r.getWidth() - aw), false, hoverZone == 3);
-    g.setFont (Font (FontOptions (labelFace).withHeight (19.0f)).withExtraKerningFactor (0.03f));
+    g.setFont (Font (FontOptions (labelFace).withHeight (18.5f)).withExtraKerningFactor (0.03f));
     g.setColour ((midiFlash > 0 ? lcd : inkWhite).withAlpha (hoverZone == 2 ? 1.0f : 0.9f));
     g.drawFittedText (lastPreset, r.reduced (aw, 0.0f).toNearestInt(), Justification::centred, 1, 0.75f);
 }

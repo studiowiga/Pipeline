@@ -2,7 +2,7 @@
 
 Plugin VST3 (Windows x64 et macOS universel) au format pédale simple : **vibrato de hauteur à 8 modes**, d'après le fonctionnement de l'**EarthQuaker Devices Aqueduct**. Nom dans le DAW : **Pipeline (Studio Wiga)**.
 
-Visuel : `design/source/pipeline_visuel.jpg` (fourni par Studio Wiga), retravaillé par `tools/make_background.py` (pédale moins haute, potards abaissés, LED en haut, footswitch et logo remontés, MODE au-dessus du sélecteur). Toutes les positions passent par `Layout.h`.
+Visuel : `design/source/pipeline_visuel_vagues.png` (fourni par Studio Wiga, vagues), retravaillé par `tools/make_background.py` (pédale moins haute, potards abaissés, LED en haut, footswitch et logo remontés, MODE au-dessus du sélecteur, cadrage serré). Le footswitch est celui du visuel (les vagues passent dessous). Toutes les positions passent par `Layout.h`.
 
 ## Commandes
 
@@ -30,7 +30,7 @@ JUCE 8.0.15 ; rendu logiciel forcé sous Windows (réappliqué à chaque nouvell
 - `tools/make_background.py` : fond tiré du visuel (repères effacés, éléments déplacés), calque de la LED, `Layout.h`.
 - `tools/render/` : compile la vraie fenêtre sous Linux et exporte les captures ; `tools/manual.py` : notice PDF.
 - `tests/test_dsp.cpp` : banc d'essai du moteur (hauteur mesurée par mode, crêtes, bypass exact).
-- `docs/Pipeline_Manual_EN-FR_v1.1.0.pdf` : notice bilingue.
+- `docs/Pipeline_Manual_EN-FR_v1.2.0.pdf` : notice bilingue.
 
 ## Compilation
 
@@ -41,5 +41,6 @@ Le workflow GitHub `build.yml` produit les artefacts `Pipeline-VST3-Windows` et 
 
 ## Historique
 
+- **1.2.0** : nouveau visuel « vagues » avec les mêmes retouches (hauteur réduite, potards abaissés, LED en haut, footswitch et logo remontés, MODE au-dessus du sélecteur) ; pédale agrandie dans la fenêtre (marges réduites, taille de fenêtre inchangée).
 - **1.1.0** : visuel définitif de Studio Wiga intégré et retouché (hauteur réduite, potards abaissés, LED en haut, footswitch Echoflex et logo remontés, MODE au-dessus du sélecteur).
 - **1.0.0** : première version (8 modes, Flexi-Switch, synchro tempo, MIDI Learn, 15 presets, visuel provisoire).
