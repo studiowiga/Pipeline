@@ -129,12 +129,34 @@ void ModeKnob::mouseDown (const MouseEvent& e)
 {
     if (e.mods.isPopupMenu()) { if (onRightClick) onRightClick(); return; }
     dragStartPos = pos;
+    dragging = true;
 }
 
+// Selecteur a crans : 40 px de deplacement par cran. Entre deux crans le repere ne suit la souris que d'un tiers de cran
+// (resistance du ressort) ; au-dela de la moitie du chemin + 10 % (hysteresis), il bascule dans le cran suivant.
+// Aux extremites (SINE / ENV P) la butee bloque : le repere ne depasse que de quelques degres.
 void ModeKnob::mouseDrag (const MouseEvent& e)
 {
-    const int d = (e.getDistanceFromDragStartX() - e.getDistanceFromDragStartY()) / 24;
-    moveTo (dragStartPos + d);
+    if (! dragging) return;
+    constexpr float pxPerStep = 40.0f;
+    const float raw = (float) dragStartPos + (float) (e.getDistanceFromDragStartX() - e.getDistanceFromDragStartY()) / pxPerStep;
+    int np = pos;
+    if (raw > (float) pos + 0.60f) np = (int) std::floor (raw + 0.40f);
+    else if (raw < (float) pos - 0.60f) np = (int) std::ceil (raw - 0.40f);
+    np = jlimit (0, 7, np);
+    if (np != pos) moveTo (np);
+    float off = raw - (float) pos;
+    if ((pos == 0 && off < 0.0f) || (pos == 7 && off > 0.0f))
+        off = 0.12f * std::tanh (off * 2.0f);                           // butee de fin de course
+    else
+        off = 0.33f * std::tanh (off * 1.8f);                           // resistance du cran
+    lean = degreesToRadians (layout::modeStepDeg) * off;
+}
+
+void ModeKnob::mouseUp (const MouseEvent&)
+{
+    dragging = false;
+    lean = 0.0f;                                                       // le ressort ramene le repere au centre du cran
 }
 
 void ModeKnob::mouseWheelMove (const MouseEvent&, const MouseWheelDetails& w)
@@ -144,14 +166,17 @@ void ModeKnob::mouseWheelMove (const MouseEvent&, const MouseWheelDetails& w)
 
 bool ModeKnob::tick()
 {
-    // le selecteur tourne d'un cran a l'autre en ~70 ms (pas de saut)
-    const float d = targetAngle - shownAngle;
-    if (std::abs (d) < 0.002f)
+    // ressort amorti (30 Hz) : passage rapide d'un cran a l'autre avec un petit depassement, comme un vrai cran
+    const float goal = targetAngle + lean;
+    const float d = goal - shownAngle;
+    if (std::abs (d) < 0.0015f && std::abs (velocity) < 0.0015f)
     {
-        if (d != 0.0f) { shownAngle = targetAngle; return true; }
+        velocity = 0.0f;
+        if (shownAngle != goal) { shownAngle = goal; return true; }
         return false;
     }
-    shownAngle += d * 0.55f;
+    velocity = velocity * 0.25f + d * 0.55f;          // ~6 % de depassement, pose en ~150 ms
+    shownAngle += velocity;
     return true;
 }
 
@@ -435,7 +460,8 @@ void PipelineAudioProcessorEditor::timerCallback()
     // etiquette du mode choisi : s'allume en bleu (fondu 0,35 a l'allumage, 0,22 a l'extinction, par image a 30 Hz)
     for (int i = 0; i < 8; ++i)
     {
-        const float t = (i == modeKnob.getPosition()) ? 1.0f : 0.0f;
+        // allumee seulement quand l'effet est en marche (pedale coupee : toutes les etiquettes s'eteignent)
+        const float t = (i == modeKnob.getPosition() && proc.raw ("active") > 0.5f) ? 1.0f : 0.0f;
         labelLit[i] += (t - labelLit[i]) * (t > labelLit[i] ? 0.35f : 0.22f);
         if (std::abs (labelLit[i] - t) < 0.004f) labelLit[i] = t;
         if (std::abs (labelLit[i] - drawnLabel[i]) > 0.003f)
@@ -612,9 +638,9 @@ void PipelineAudioProcessorEditor::drawFootswitch (Graphics& g)
     if (! foot.isPressed()) return;
     // bouton assombri tant qu'on appuie (comportement Echoflex) : disque noir 25 %, rayon footR x 0,54, bord adouci
     const auto c = layout::footPos;
-    const float r = layout::footR * 0.54f;
-    ColourGradient shade (Colours::black.withAlpha (0.25f), c.x, c.y, Colours::black.withAlpha (0.0f), c.x + r, c.y, true);
-    shade.addColour (0.80, Colours::black.withAlpha (0.23f));
+    const float r = layout::footR * 1.02f;          // bouton + bague moletee assombris quand on appuie
+    ColourGradient shade (Colours::black.withAlpha (0.40f), c.x, c.y, Colours::black.withAlpha (0.0f), c.x + r, c.y, true);
+    shade.addColour (0.88, Colours::black.withAlpha (0.36f));
     g.setGradientFill (shade);
     g.fillEllipse (c.x - r, c.y - r, r * 2.0f, r * 2.0f);
 }
@@ -730,6 +756,26 @@ void PipelineAudioProcessorEditor::drawScope (Graphics& g, Rectangle<float> r)
     g.strokePath (p, PathStrokeType (1.4f, PathStrokeType::curved, PathStrokeType::rounded));
 }
 
+// police de la barre de presets : la plus grande (28 au maximum) qui fait tenir le plus long nom d'usine
+Font PipelineAudioProcessorEditor::presetFont (float availW)
+{
+    if (presetFontAvail != availW)
+    {
+        presetFontAvail = availW;
+        float h = 28.0f;
+        for (; h > 14.0f; h -= 0.5f)
+        {
+            const Font f = Font (FontOptions (labelFace).withHeight (h)).withExtraKerningFactor (0.03f);
+            float widest = 0.0f;
+            for (int i = 0; i < PipelineAudioProcessor::getNumFactoryPresets(); ++i)
+                widest = jmax (widest, GlyphArrangement::getStringWidth (f, "P" + String (i + 1) + "  " + PipelineAudioProcessor::getFactoryPreset (i).name));
+            if (widest <= availW) break;
+        }
+        presetFontH = h;
+    }
+    return Font (FontOptions (labelFace).withHeight (presetFontH)).withExtraKerningFactor (0.03f);
+}
+
 void PipelineAudioProcessorEditor::drawDisplay (Graphics& g)
 {
     // ligne du haut : reglage qui vient de bouger (fondu), sinon ce que fait le vibrato ; couleur bleu glace
@@ -769,9 +815,11 @@ void PipelineAudioProcessorEditor::drawDisplay (Graphics& g)
     };
     arrow (r.withWidth (aw), true, hoverZone == 1);
     arrow (r.withTrimmedLeft (r.getWidth() - aw), false, hoverZone == 3);
-    g.setFont (Font (FontOptions (labelFace).withHeight (18.5f)).withExtraKerningFactor (0.03f));
-    g.setColour ((midiFlash > 0 ? lcd : inkWhite).withAlpha (hoverZone == 2 ? 1.0f : 0.9f));
-    g.drawFittedText (lastPreset, r.reduced (aw, 0.0f).toNearestInt(), Justification::centred, 1, 0.75f);
+    // nom du preset en grand : taille commune choisie pour que le nom le plus long tienne entier (jamais tasse ni coupe)
+    const auto nameArea = r.reduced (aw - 4.0f, 0.0f);
+    g.setFont (presetFont (nameArea.getWidth() - 6.0f));
+    g.setColour ((midiFlash > 0 ? lcd : inkWhite).withAlpha (hoverZone == 2 ? 1.0f : 0.92f));
+    g.drawText (lastPreset, nameArea, Justification::centred, false);
 }
 
 void PipelineAudioProcessorEditor::paint (Graphics& g)

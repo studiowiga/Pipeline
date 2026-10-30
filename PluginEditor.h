@@ -39,6 +39,7 @@ public:
     bool hitTest (int x, int y) override;
     void mouseDown (const juce::MouseEvent&) override;
     void mouseDrag (const juce::MouseEvent&) override;
+    void mouseUp (const juce::MouseEvent&) override;
     void mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails&) override;
     bool tick();
     void moveTo (int p);
@@ -50,6 +51,9 @@ private:
     juce::ParameterAttachment attachment;
     int pos = 0, dragStartPos = 0;
     float shownAngle = 0.0f, targetAngle = 0.0f;
+    // crans (butees) : le repere resiste un peu puis « tombe » dans le cran suivant avec un leger rebond
+    float lean = 0.0f, velocity = 0.0f;
+    bool dragging = false;
 };
 
 //==============================================================================
@@ -132,6 +136,8 @@ private:
     void drawKnobs (juce::Graphics&);
     void drawFootswitch (juce::Graphics&);
     void drawDisplay (juce::Graphics&);
+    juce::Font presetFont (float availW);
+    float presetFontAvail = -1.0f, presetFontH = 22.0f;
 
     PipelineAudioProcessor& proc;
     PipelineLookAndFeel lnf;

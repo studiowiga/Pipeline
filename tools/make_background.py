@@ -46,7 +46,7 @@ BAR = (308.0, 998.0, 808.0, 1046.0)      # barre de presets (cadre garde)
 LOGO_BOX = (455, 1302, 664, 1325)
 
 D_KNOBS = 26                              # potards (et leurs graduations / etiquettes) abaisses
-MODE_WORD_NEW_Y = 449.0
+MODE_WORD_NEW_Y = 441.0
 LED_NEW = (558.0, 124.0)
 # remappage du bas (destination <- source) : identite jusqu'a l'ecran, bande de la LED resserree,
 # bloc du footswitch rigide, bande sous le footswitch un peu etiree (place du logo), puis tout remonte de 20 px
@@ -272,6 +272,35 @@ for jb in ((156, 378, 219, 524), (897, 378, 962, 524)):
     x0, y0, x1, y1 = jb
     plate[y0:y1, x0:x1] = col_fill(plate, jb) + grain((y1 - y0, x1 - x0, 3), 1.3)
 
+# etiquettes du selecteur agrandies (+30 %) : lettres du visuel extraites (matte blanc), effacees, recollees plus grandes
+# au meme centre, un peu ecartees du selecteur (les crans ont ete allonges)
+LABELS_SRC = [(487, 668, 523, 684), (436, 609, 460, 625), (433, 524, 477, 540), (505, 474, 534, 490),
+              (577, 474, 618, 490), (641, 524, 687, 540), (647, 609, 693, 625), (590, 668, 635, 684)]
+LBL_SCALE, LBL_PUSH = 1.30, 5.0
+LABELS = []
+mattes = []
+for (x0, y0, x1, y1) in LABELS_SRC:
+    X0, Y0, X1, Y1 = x0 - 3, y0 - 3, x1 + 3, y1 + 3
+    reg = plate[Y0:Y1, X0:X1].copy()
+    m = cv2.dilate((lum(reg) > 150).astype(np.uint8), np.ones((3, 3), np.uint8))
+    bg = cv2.inpaint(np.clip(reg, 0, 255).astype(np.uint8), m, 3, cv2.INPAINT_TELEA).astype(np.float32)
+    mattes.append(np.clip((lum(reg) - lum(bg)) / np.maximum(232.0 - lum(bg), 30.0), 0, 1) * (m > 0))
+    plate[Y0:Y1, X0:X1] = np.where(m[..., None] > 0, bg + grain(bg.shape, 1.5), reg)
+for (x0, y0, x1, y1), mt in zip(LABELS_SRC, mattes):
+    cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+    dx, dy = cx - MODE_C[0], cy - MODE_C[1]; dn = math.hypot(dx, dy)
+    cx, cy = cx + dx / dn * LBL_PUSH, cy + dy / dn * LBL_PUSH
+    h0, w0 = mt.shape
+    big = np.asarray(Image.fromarray((mt * 255).astype(np.uint8)).resize((round(w0 * LBL_SCALE), round(h0 * LBL_SCALE)), Image.LANCZOS)).astype(np.float32) / 255
+    hh, ww = big.shape
+    nx0, ny0 = int(round(cx - ww / 2)), int(round(cy - hh / 2))
+    sh_ = np.roll(np.roll(cv2.GaussianBlur(big, (0, 0), 0.9), 1, 0), 1, 1)
+    reg = plate[ny0:ny0 + hh, nx0:nx0 + ww]
+    reg = reg * (1 - 0.30 * sh_ * (1 - big))[..., None]
+    plate[ny0:ny0 + hh, nx0:nx0 + ww] = reg * (1 - big[..., None]) + np.array([232, 235, 233], np.float32) * big[..., None]
+    hw, hh2 = (x1 - x0) * LBL_SCALE / 2, (y1 - y0) * LBL_SCALE / 2
+    LABELS.append((cx - hw, cy - hh2, cx + hw, cy + hh2))
+
 def paste_delta(img, k, dx, dy):
     x0, y0, x1, y1 = BOXES[k]
     delta = (A[y0:y1, x0:x1] - FILL[k]) * ALPHA[k][..., None]
@@ -492,9 +521,8 @@ Image.fromarray(out).save(os.path.join(ROOT, 'background.jpg'), quality=93, subs
 # ------------------------------------------------------------------ 6a'. etiquettes du selecteur allumees en bleu (ecriture LED)
 # une image par mode (ordre du parametre : SINE, TRI, RAMP, SQR, RAND, ENV D, ENV R, ENV P), toutes de meme taille,
 # centrees sur l'etiquette : coeur bleu tres clair + halo bleu ; le plugin affiche celle du mode choisi en fondu
-LABELS = [(487, 668, 523, 684), (436, 609, 460, 625), (433, 524, 477, 540), (505, 474, 534, 490),
-          (577, 474, 618, 490), (641, 524, 687, 540), (647, 609, 693, 625), (590, 668, 635, 684)]
-LBL_PAD = 16
+# (LABELS : boites des etiquettes agrandies, calculees plus haut)
+LBL_PAD = 18
 boxes = []
 for (x0_, y0_, x1_, y1_) in LABELS:
     ax, ay = T((x0_ - 2, y0_ - 2)); bx, by = T((x1_ + 2, y1_ + 2))

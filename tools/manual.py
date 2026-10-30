@@ -16,7 +16,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SHOTS = sys.argv[1]
 OUT = sys.argv[2]
-VERSION = "1.4.0"
+VERSION = "1.4.1"
 TMP = os.path.dirname(os.path.abspath(OUT))
 FONTS = os.path.join(ROOT, "assets", "fonts")
 
@@ -56,8 +56,8 @@ def strip(images, path, gap=16):
     for i in images: s.paste(i, (x, 0)); x += i.width + gap
     s.save(path); return path
 
-knobs_img = strip([crop_u(shot("pipeline_full.png"), (150, 112, 610, 300))], os.path.join(TMP, "pipeline_knobs.png"))
-mode_img = strip([crop_u(shot("pipeline_full.png"), (262, 300, 504, 502)), crop_u(shot("pipeline_envp.png"), (262, 300, 504, 502))],
+knobs_img = strip([crop_u(shot("pipeline_full.png"), (150, 112, 610, 296))], os.path.join(TMP, "pipeline_knobs.png"))
+mode_img = strip([crop_u(shot("pipeline_full.png"), (232, 296, 530, 506)), crop_u(shot("pipeline_envp.png"), (232, 296, 530, 506))],
                  os.path.join(TMP, "pipeline_mode.png"))
 fs_img = strip([crop_u(shot("pipeline_bypass.png"), (316, 778, 446, 904)), crop_u(shot("pipeline_full.png"), (316, 778, 446, 904)),
                 crop_u(shot("pipeline_pressed.png"), (316, 778, 446, 904))], os.path.join(TMP, "pipeline_fs.png"))
@@ -194,7 +194,7 @@ T["en"] = dict(
       ("Turning the knobs", "Drag up / right to increase; Shift for fine adjustment; mouse wheel; double-click returns to 12 o'clock. These are the knurled knobs of Holyverb: the knurling turns with the knob, the white index and dot follow the exact angle, while the reflections and the shadow stay still, lit from the top left like the rest of the pedal.")],
  knobs_cap="RATE and DEPTH: the knurled knobs of Holyverb.",
  modes_t="5. The eight modes",
- modes_intro="As in the original manual, the modes are listed from \"not that weird\" to \"wow, that's weird\". Click the MODE knob and drag, use the mouse wheel, or click directly on a label around the selector. The label of the selected mode lights up in blue, like LED lettering.",
+ modes_intro="As in the original manual, the modes are listed from \"not that weird\" to \"wow, that's weird\". Click the MODE knob and drag, use the mouse wheel, or click directly on a label around the selector. The selector has real detents: the marker resists, then clicks into the next position with a small bounce, and it stops at both ends (SINE and ENV P). The label of the selected mode lights up in blue, like LED lettering, and goes out when the effect is bypassed.",
  modes=[["Mode", "What you hear", "RATE", "DEPTH"],
         ["SINE", "Smooth, rolling pitch: the classic amp vibrato.", "Speed", "Intensity"],
         ["TRIANGLE", "Sharper rise and fall than the sine, a more pronounced bend at the peak of each cycle.", "Speed", "Intensity"],
@@ -206,7 +206,7 @@ T["en"] = dict(
         ["ENV P", "\"My Bloody Valentine\" mode: each attack makes the pitch dip, like a tremolo arm, then float back. The only mode with a dry signal.", "Bend sensitivity and range", "Dry / wet mix"]],
  envp=["<b>Env P mix</b>: DEPTH fully counter-clockwise = all dry, 12 o'clock = 50 / 50 with a small amount of phase cancellation (touch-sensitive chorus, pseudo-flange), fully clockwise = all wet (pure pitch dips). Above noon the dry signal is gradually removed.",
        "<b>Envelope modes</b>: as the original manual advises, place Pipeline first in the chain, before anything that adds gain. It is tuned for low- to medium-output pickups; with hot pickups lower the sensitivity (RATE in Env R and Env P, DEPTH in Env D)."],
- mode_cap="The MODE selector (Sine, then Env P): it turns step by step to its new position and the label of the selected mode lights up in blue.",
+ mode_cap="The MODE selector (Sine, then Env P): it clicks from detent to detent (end stops at SINE and ENV P) and the label of the selected mode lights up in blue (it goes out when the effect is bypassed).",
  fs_t="6. Footswitch, LED and tempo sync",
  fs=["<b>Flexi-Switch</b> (as on the Aqueduct): a short click switches the effect on or off. Press and hold while the effect is off and it works as a momentary switch: the effect is on while you hold it and switches off when you release (after about 0.45 s). The button darkens while it is pressed. This behaviour can be switched off in right-click &gt; <b>Settings</b> &gt; <b>Flexi-Switch: hold = momentary</b>.",
      "Bypass and switching use a short 12 ms crossfade (no click), like the pedal's silent relay switching. The <b>LED</b> fades on and off and lights the panel around it.",
@@ -270,7 +270,7 @@ T["fr"] = dict(
       ("Tourner les potards", "Tirez vers le haut / la droite pour augmenter ; Maj = réglage fin ; molette ; double-clic = retour à 12 h. Ce sont les potards moletés de Holyverb : le moletage tourne avec le potard, l'index blanc et le point suivent l'angle exact, tandis que les reflets et l'ombre restent fixes, éclairés depuis le haut à gauche comme le reste de la pédale.")],
  knobs_cap="RATE et DEPTH : les potards moletés de Holyverb.",
  modes_t="5. Les huit modes",
- modes_intro="Comme dans le manuel d'origine, les modes sont classés du « pas si bizarre » au « franchement bizarre ». Cliquez sur le sélecteur MODE et tirez, utilisez la molette, ou cliquez directement sur une étiquette autour du sélecteur. L'étiquette du mode choisi s'allume en bleu, comme une écriture LED.",
+ modes_intro="Comme dans le manuel d'origine, les modes sont classés du « pas si bizarre » au « franchement bizarre ». Cliquez sur le sélecteur MODE et tirez, utilisez la molette, ou cliquez directement sur une étiquette autour du sélecteur. Le sélecteur a de vrais crans : le repère résiste, puis tombe dans la position suivante avec un léger rebond, et il bute aux deux extrémités (SINE et ENV P). L'étiquette du mode choisi s'allume en bleu, comme une écriture LED, et s'éteint quand l'effet est coupé.",
  modes=[["Mode", "Ce qu'on entend", "RATE", "DEPTH"],
         ["SINE", "Hauteur qui ondule en douceur : le vibrato d'ampli classique.", "Vitesse", "Intensité"],
         ["TRIANGLE", "Montée et descente plus franches que le sinus, un bend plus marqué au sommet de chaque cycle.", "Vitesse", "Intensité"],
@@ -282,7 +282,7 @@ T["fr"] = dict(
         ["ENV P", "Mode « My Bloody Valentine » : chaque attaque fait plonger la hauteur, comme un levier de vibrato, puis elle remonte. Seul mode avec signal sec.", "Sensibilité et amplitude du bend", "Mélange sec / traité"]],
  envp=["<b>Mélange en Env P</b> : DEPTH tout à gauche = tout sec, 12 h = 50 / 50 avec un peu d'annulation de phase (chorus sensible au toucher, pseudo-flanger), tout à droite = tout traité (plongées de hauteur pures). Au-delà de midi, le signal sec diminue progressivement.",
        "<b>Modes d'enveloppe</b> : comme le conseille le manuel d'origine, placez Pipeline en premier dans la chaîne, avant tout ce qui ajoute du gain. Il est réglé pour des micros à sortie faible ou moyenne ; avec des micros puissants, baissez la sensibilité (RATE en Env R et Env P, DEPTH en Env D)."],
- mode_cap="Le sélecteur MODE (Sine, puis Env P) : il tourne cran par cran jusqu'à sa nouvelle position et l'étiquette du mode choisi s'allume en bleu.",
+ mode_cap="Le sélecteur MODE (Sine, puis Env P) : il passe d'un cran à l'autre (butées sur SINE et ENV P) et l'étiquette du mode choisi s'allume en bleu (elle s'éteint quand l'effet est coupé).",
  fs_t="6. Footswitch, LED et synchro tempo",
  fs=["<b>Flexi-Switch</b> (comme sur l'Aqueduct) : un clic bref met l'effet en marche ou le coupe. Si l'effet est coupé et que vous maintenez l'appui, le footswitch devient momentané : l'effet agit tant que vous appuyez et se coupe au relâchement (au-delà d'environ 0,45 s). Le bouton s'assombrit tant qu'il est enfoncé. Ce comportement se désactive par clic droit &gt; <b>Settings</b> &gt; <b>Flexi-Switch: hold = momentary</b>.",
      "Le bypass et les commutations passent par un court fondu de 12 ms (aucun clic), comme la commutation silencieuse à relais de la pédale. La <b>LED</b> s'allume et s'éteint en fondu et éclaire la façade autour d'elle.",

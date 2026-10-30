@@ -65,6 +65,8 @@ int main (int argc, char** argv)
         save (name);
     };
     shot ("pipeline_default", 0, true,  0.0f,   0.0f, PipelineAudioProcessorEditor::defaultH);
+    shot ("pipeline_longname", 1, true, 0.0f,   0.0f, PipelineAudioProcessorEditor::baseH);
+    shot ("pipeline_longname60", 1, true, 0.0f, 0.0f, PipelineAudioProcessorEditor::defaultH);
     shot ("pipeline_full",    0, true,  196.0f, 1.2f, PipelineAudioProcessorEditor::baseH);
     shot ("pipeline_envp",    12, true, 110.0f, 0.15f, PipelineAudioProcessorEditor::baseH);
     shot ("pipeline_status",  6, true,  0.0f,   0.0f, PipelineAudioProcessorEditor::baseH, "rate", 7.2f);

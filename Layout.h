@@ -11,7 +11,7 @@ namespace layout
     const juce::Rectangle<float> glowRect { 312.00f, 1.00f, 136.00f, 136.00f };
     const juce::Rectangle<float> rowRect { 179.87f, 661.18f, 403.37f, 50.46f };
     const juce::Rectangle<float> barRect { 186.07f, 717.57f, 387.85f, 35.62f };
-    // etiquettes du selecteur allumees (mode_labels.png : 8 images 110 x 62 px du fond 2x empilees)
-    const float labelW = 55.00f, labelH = 31.00f;
-    const juce::Point<float> labelPos[8] = { { 339.00f, 478.50f }, { 294.50f, 435.00f }, { 300.00f, 372.00f }, { 350.00f, 334.50f }, { 410.50f, 334.50f }, { 462.00f, 372.00f }, { 467.00f, 435.00f }, { 422.50f, 478.50f } };
+    // etiquettes du selecteur allumees (mode_labels.png : 8 images 135 x 73 px du fond 2x empilees)
+    const float labelW = 67.50f, labelH = 36.50f;
+    const juce::Point<float> labelPos[8] = { { 336.75f, 481.75f }, { 290.75f, 435.75f }, { 296.75f, 370.25f }, { 348.75f, 331.25f }, { 412.25f, 331.25f }, { 465.75f, 370.25f }, { 470.75f, 435.75f }, { 424.25f, 481.75f } };
 }
